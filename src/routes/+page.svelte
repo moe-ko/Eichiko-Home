@@ -3,6 +3,7 @@
   import { getLondonWeather } from '$lib/api/weather';
   import { getAllLineStatusByMode, getStopArrivals } from '$lib/api/tfl';
   import { getDepartures, type TrainService } from '$lib/api/rail';
+  import { getUpcomingEvents, type CalendarEvent } from '$lib/api/calendar';
   import { TUBE_LINES } from '$lib/constants/lines';
 
   let weather: any = $state(null);
@@ -12,6 +13,13 @@
   let lineError = $state('');
   let railError = $state('');
   let lineStatusCollapsed = $state(true);
+  let appointments: CalendarEvent[] = $state([]);
+  let appointmentsError = $state('');
+  let expandedEvents: Record<string, boolean> = $state({});
+
+  function toggleEvent(key: string) {
+    expandedEvents[key] = !expandedEvents[key];
+  }
 
   const BUS_STOPS = [
     { label: 'Bexley Road / Glenesk Road (Stop AF)', id: '490007227W' },
@@ -175,7 +183,7 @@
   }
 
   async function fetchAllData() {
-    await Promise.all([fetchBusArrivals(), fetchTrainDepartures(), loadLineStatus()]);
+    await Promise.all([fetchBusArrivals(), fetchTrainDepartures(), loadLineStatus(), fetchAppointments()]);
   }
 
   async function fetchBusArrivals() {
@@ -203,6 +211,15 @@
     }));
   }
 
+  async function fetchAppointments() {
+    try {
+      appointments = await getUpcomingEvents();
+      appointmentsError = '';
+    } catch (e: any) {
+      appointmentsError = e.message;
+    }
+  }
+
   function formatMins(seconds: number): string {
     const m = Math.floor(seconds / 60);
     return m <= 0 ? 'DUE' : `${m}`;
@@ -215,6 +232,21 @@
 
   function formatTime(date: Date): string {
     return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function formatEventTime(iso: string): string {
+    const d = new Date(iso);
+    const now = new Date();
+    const diffDays = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    const hh = d.getHours().toString().padStart(2, '0');
+    const mm = d.getMinutes().toString().padStart(2, '0');
+    if (diffDays < 7) {
+      const dow = d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase();
+      return `${dow} ${hh}:${mm}`;
+    }
+    const day = d.getDate().toString().padStart(2, '0');
+    const mon = d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase();
+    return `${day} ${mon} ${hh}:${mm}`;
   }
 </script>
 
@@ -309,6 +341,61 @@
             {/if}
           </div>
         </div>
+      {/if}
+    </div>
+
+    <!-- Appointments -->
+    <div class="board-section grid-full appointments">
+      <div class="section-header">
+        <span class="section-type-badge badge-calendar">APPOINTMENTS</span>
+        <span class="tap-hint">TAP AN EVENT FOR DETAILS</span>
+      </div>
+      <div class="col-header-row col-header-yellow">
+        <span class="col-time">TIME</span>
+        <span class="col-event">EVENT</span>
+      </div>
+      {#if appointmentsError}
+        <div class="led-row"><span class="error-text">{appointmentsError}</span></div>
+      {:else if appointments.length === 0}
+        <div class="led-row"><span class="loading-text">NO UPCOMING EVENTS</span></div>
+      {:else}
+        {#each appointments as evt, i}
+          {@const hasDetails = !!(evt.location || evt.description)}
+          {@const isExpanded = expandedEvents[evt.start] === true}
+          {#if hasDetails}
+            <button
+              type="button"
+              class="led-row event-row"
+              class:row-alt={i % 2 === 1}
+              onclick={() => toggleEvent(evt.start)}
+            >
+              <span class="col-time led-yellow">{formatEventTime(evt.start)}</span>
+              <span class="col-event led-yellow">{evt.summary.toUpperCase()}</span>
+              <span class="event-chevron">{isExpanded ? '▼' : '▶'}</span>
+            </button>
+          {:else}
+            <div class="led-row" class:row-alt={i % 2 === 1}>
+              <span class="col-time led-yellow">{formatEventTime(evt.start)}</span>
+              <span class="col-event led-yellow">{evt.summary.toUpperCase()}</span>
+            </div>
+          {/if}
+          {#if hasDetails && isExpanded}
+            <div class="led-sub-row" class:row-alt={i % 2 === 1}>
+              {#if evt.location}
+                <div class="sub-line">
+                  <span class="sub-label">LOCATION:</span>
+                  <span class="sub-value sub-value-upper">{evt.location}</span>
+                </div>
+              {/if}
+              {#if evt.description}
+                <div class="sub-line">
+                  <span class="sub-label">DESCRIPTION:</span>
+                  <span class="sub-value">{evt.description}</span>
+                </div>
+              {/if}
+            </div>
+          {/if}
+        {/each}
       {/if}
     </div>
 
@@ -680,6 +767,9 @@
   .col-dest {
     flex: 1;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .col-mins {
@@ -705,6 +795,9 @@
   .col-train-dest {
     flex: 1;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .col-train-status {
@@ -807,6 +900,13 @@
     .col-time { width: 50px; }
     .col-train-status { width: 80px; }
     .col-plat { width: 36px; }
+    .appointments .col-time { width: 100px; }
+    .led-sub-row {
+      padding: 6px 12px 10px 12px;
+      font-size: 0.75rem;
+    }
+    .sub-label { width: 110px; }
+    .sub-line { gap: 8px; }
     .line-status-grid {
       grid-template-columns: 1fr;
     }
@@ -817,5 +917,114 @@
     .line-status-col:last-child {
       border-bottom: none;
     }
+  }
+
+  /* ── Appointments ── */
+  .badge-calendar {
+    background: #00D9FF;
+    color: #000;
+    padding: 4px 14px;
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+  }
+
+  .event-row {
+    width: 100%;
+    border: none;
+    border-bottom: 1px solid #1a1200;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    align-items: center;
+  }
+
+  .event-row:hover {
+    background: #1a1200;
+  }
+
+  .event-row.row-alt:hover {
+    background: #14100a;
+  }
+
+  .event-chevron {
+    flex-shrink: 0;
+    width: 24px;
+    text-align: right;
+    color: #FFD600;
+    font-size: 0.75rem;
+    text-shadow: 0 0 6px rgba(255, 214, 0, 0.4);
+  }
+
+  .col-event {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Wider time column for appointments, no wrap */
+  .appointments .col-time {
+    width: 130px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .appointments .led-row {
+    gap: 16px;
+  }
+
+  .appointments .col-header-row {
+    gap: 16px;
+  }
+
+  .led-sub-row {
+    background: #0f0f0f;
+    border-bottom: 1px solid #1a1200;
+    padding: 8px 24px 14px 24px;
+    font-family: 'LED Dot-Matrix', monospace;
+    letter-spacing: 2px;
+    font-size: 0.9rem;
+    color: #FF6A00;
+    text-shadow: 0 0 8px rgba(255, 106, 0, 0.4);
+    text-transform: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    gap: 6px;
+  }
+
+  .led-sub-row.row-alt {
+    background: #0a0a0a;
+  }
+
+  .sub-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    line-height: 1.5;
+    width: 100%;
+    text-align: left;
+  }
+
+  .sub-label {
+    flex-shrink: 0;
+    width: 140px;
+    color: #FFD600;
+    text-shadow: 0 0 6px rgba(255, 214, 0, 0.4);
+    text-transform: uppercase;
+  }
+
+  .sub-value {
+    flex: 1;
+    min-width: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    text-transform: none;
+  }
+
+  .sub-value-upper {
+    text-transform: uppercase;
   }
 </style>

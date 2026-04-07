@@ -10,4 +10,22 @@ declare global {
 	}
 }
 
+declare module 'node-ical' {
+	interface VEvent {
+		type: 'VEVENT';
+		start: Date;
+		end: Date;
+		summary?: string;
+		location?: string;
+		description?: string;
+		[key: string]: unknown;
+	}
+
+	interface ICalComponent {
+		[key: string]: VEvent | { type: string } | unknown;
+	}
+
+	export function parseICS(text: string): ICalComponent;
+}
+
 export {};
