@@ -18,7 +18,7 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
 
   const numRows = url.searchParams.get('numRows') ?? '8';
   const res = await fetch(
-    `https://huxley2.azurewebsites.net/departures/${params.crs}/${numRows}?expand=false`,
+    `https://hux.azurewebsites.net/departures/${params.crs}/${numRows}?expand=false`,
     { signal: AbortSignal.timeout(8000) }
   );
   if (!res.ok) return json({ error: `Rail API: ${res.status}` }, { status: res.status });

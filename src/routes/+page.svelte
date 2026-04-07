@@ -39,7 +39,7 @@
 
   const WEATHER_PHRASES: Record<string, string[]> = {
     hot: [
-      "babe it's roasting out there please put on some suncream",
+      "love, it's roasting out there please put on some suncream",
       "oh my god it's so hot today wear something light ok",
       "seriously don't forget water it's way too hot out there",
       "going out? you won't need a jacket trust me it's boiling",
@@ -63,7 +63,7 @@
       "might want to grab a hoodie just in case",
     ],
     rain: [
-      "babe seriously take your umbrella today",
+      "love, seriously take your umbrella today",
       "don't even think about leaving without an umbrella",
       "it's proper raining out there you'll get soaked",
       "take your umbrella I'm not gonna say it twice",
@@ -72,16 +72,16 @@
       "it is absolutely pouring out there umbrella is not optional",
       "you will get completely drenched without an umbrella please take one",
       "it's really bad out there umbrella and a waterproof if you have one",
-      "babe please take an umbrella it's chucking it down",
+      "love, please take an umbrella it's chucking it down",
     ],
     thunderstorm: [
       "there's a proper storm out there please be careful",
       "lightning and everything out there try to stay indoors if you can",
       "seriously wild weather today please take care",
-      "babe it's really rough out there stay safe ok",
+      "love, it's really rough out there stay safe ok",
     ],
     snow: [
-      "babe it's snowing out there wrap up warm",
+      "love, it's snowing out there wrap up warm",
       "snow on the ground watch your step it might be slippery",
       "it's actually snowing dress warm and take it slow",
       "proper winter weather today make sure you're all wrapped up",

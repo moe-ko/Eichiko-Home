@@ -26,4 +26,5 @@ vite.config.ts.timestamp-*
 .project_related
 .vscode
 CLAUDE.md
+AGENTS.md
 .claude/
