@@ -807,5 +807,15 @@
     .col-time { width: 50px; }
     .col-train-status { width: 80px; }
     .col-plat { width: 36px; }
+    .line-status-grid {
+      grid-template-columns: 1fr;
+    }
+    .line-status-col {
+      border-right: none;
+      border-bottom: 1px solid #2a1a00;
+    }
+    .line-status-col:last-child {
+      border-bottom: none;
+    }
   }
 </style>
