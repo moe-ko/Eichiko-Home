@@ -1,11 +1,25 @@
 [![Netlify Status](https://api.netlify.com/api/v1/badges/64cfd5aa-8502-4753-9f4a-e89a063383b3/deploy-status)](https://app.netlify.com/projects/eichiko-home/deploys)
-
+![Release](https://img.shields.io/github/v/release/moe-ko/Eichiko-Home)
+![License](https://img.shields.io/github/license/moe-ko/Eichiko-Home)
+---
 
 # Eichiko's Home
 
-A personal real-time dashboard designed to be fully responsive across all devices, styled as an LED dot-matrix departure board. Displays live London transport data, local weather, and upcoming calendar events — all in one place.
+That's my cat's name in case you were wondering. It's a personal real-time dashboard designed to be fully responsive across all devices, styled as an LED dot-matrix departure board. Displays live London transport data, local weather, and upcoming calendar events all in one place.
+
+Built to minimize information overload with a focused, personal dashboard that streamlines daily routines.
 
 ---
+
+## Screenshots
+#### Home
+![Home](./src/lib/assets/main-page.png)
+
+#### Line Status
+![Line Status](./src/lib/assets/line-status.png)
+
+#### Appointments
+![Appointments](./src/lib/assets/appointments.png)
 
 ## Features
 
@@ -84,3 +98,8 @@ npm run build
 # Preview production build
 npm run preview
 ```
+
+## Future Improvements
+- Add a settings page for configuring bus stops, train stations, and calendar feed.
+- Add a UI component to dynamically create and manage grid layouts for configurable bus stops and train station panels.
+- Implement drag-and-drop or add/remove buttons for users to customize their dashboard with new departure panels.
