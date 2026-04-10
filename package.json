@@ -24,6 +24,7 @@
 	},
 	"dependencies": {
 		"@sveltejs/adapter-netlify": "^6.0.4",
-		"node-ical": "^0.26.0"
+		"node-ical": "^0.26.0",
+		"svelte-dnd-action": "^0.9.69"
 	}
 }

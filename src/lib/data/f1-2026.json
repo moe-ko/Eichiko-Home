@@ -1,0 +1,386 @@
+[
+  {
+    "round": 1,
+    "country": "Australia",
+    "location": "Melbourne",
+    "circuit": "Albert Park Circuit",
+    "flag": "🇦🇺",
+    "date": "2026-03-16",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-03-13", "time": "12:30", "endTime": "13:30" },
+      "fp2": { "day": "Friday", "date": "2026-03-13", "time": "16:00", "endTime": "17:00" },
+      "fp3": { "day": "Saturday", "date": "2026-03-14", "time": "12:30", "endTime": "13:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-03-14", "time": "16:00", "endTime": "17:00" },
+      "race": { "day": "Sunday", "date": "2026-03-15", "time": "16:00", "endTime": "18:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 2,
+    "country": "China",
+    "location": "Shanghai",
+    "circuit": "Shanghai International Circuit",
+    "flag": "🇨🇳",
+    "date": "2026-03-22",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-03-20", "time": "11:30", "endTime": "12:30" },
+      "sprintQualifying": { "day": "Friday", "date": "2026-03-20", "time": "15:30", "endTime": "16:15" },
+      "sprintRace": { "day": "Saturday", "date": "2026-03-21", "time": "11:00", "endTime": "12:00" },
+      "qualifying": { "day": "Saturday", "date": "2026-03-21", "time": "15:00", "endTime": "16:00" },
+      "race": { "day": "Sunday", "date": "2026-03-22", "time": "15:00", "endTime": "17:00" }
+    },
+    "sprint": true
+  },
+  {
+    "round": 3,
+    "country": "Japan",
+    "location": "Suzuka",
+    "circuit": "Suzuka International Racing Course",
+    "flag": "🇯🇵",
+    "date": "2026-04-05",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-04-03", "time": "11:30", "endTime": "12:30" },
+      "fp2": { "day": "Friday", "date": "2026-04-03", "time": "15:00", "endTime": "16:00" },
+      "fp3": { "day": "Saturday", "date": "2026-04-04", "time": "11:30", "endTime": "12:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-04-04", "time": "15:00", "endTime": "16:00" },
+      "race": { "day": "Sunday", "date": "2026-04-05", "time": "14:00", "endTime": "16:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 4,
+    "country": "Bahrain",
+    "location": "Sakhir",
+    "circuit": "Bahrain International Circuit",
+    "flag": "🇧🇭",
+    "date": "2026-04-12",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-04-10", "time": "14:30", "endTime": "15:30" },
+      "fp2": { "day": "Friday", "date": "2026-04-10", "time": "18:00", "endTime": "19:00" },
+      "fp3": { "day": "Saturday", "date": "2026-04-11", "time": "14:30", "endTime": "15:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-04-11", "time": "18:00", "endTime": "19:00" },
+      "race": { "day": "Sunday", "date": "2026-04-12", "time": "18:00", "endTime": "20:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 5,
+    "country": "Saudi Arabia",
+    "location": "Jeddah",
+    "circuit": "Jeddah Corniche Circuit",
+    "flag": "🇸🇦",
+    "date": "2026-04-19",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-04-17", "time": "15:30", "endTime": "16:30" },
+      "fp2": { "day": "Friday", "date": "2026-04-17", "time": "19:00", "endTime": "20:00" },
+      "fp3": { "day": "Saturday", "date": "2026-04-18", "time": "15:30", "endTime": "16:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-04-18", "time": "19:00", "endTime": "20:00" },
+      "race": { "day": "Sunday", "date": "2026-04-19", "time": "19:00", "endTime": "21:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 6,
+    "country": "United States",
+    "location": "Miami",
+    "circuit": "Miami International Autodrome",
+    "flag": "🇺🇸",
+    "date": "2026-05-03",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-05-01", "time": "12:30", "endTime": "13:30" },
+      "sprintQualifying": { "day": "Friday", "date": "2026-05-01", "time": "16:30", "endTime": "17:15" },
+      "sprintRace": { "day": "Saturday", "date": "2026-05-02", "time": "12:00", "endTime": "13:00" },
+      "qualifying": { "day": "Saturday", "date": "2026-05-02", "time": "16:00", "endTime": "17:00" },
+      "race": { "day": "Sunday", "date": "2026-05-03", "time": "16:00", "endTime": "18:00" }
+    },
+    "sprint": true
+  },
+  {
+    "round": 7,
+    "country": "Emilia Romagna",
+    "location": "Imola",
+    "circuit": "Autodromo Enzo e Dino Ferrari",
+    "flag": "🇮🇹",
+    "date": "2026-05-17",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-05-15", "time": "13:30", "endTime": "14:30" },
+      "fp2": { "day": "Friday", "date": "2026-05-15", "time": "17:00", "endTime": "18:00" },
+      "fp3": { "day": "Saturday", "date": "2026-05-16", "time": "12:30", "endTime": "13:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-05-16", "time": "16:00", "endTime": "17:00" },
+      "race": { "day": "Sunday", "date": "2026-05-17", "time": "15:00", "endTime": "17:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 8,
+    "country": "Monaco",
+    "location": "Monaco",
+    "circuit": "Circuit de Monaco",
+    "flag": "🇲🇨",
+    "date": "2026-05-24",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-05-22", "time": "13:30", "endTime": "14:30" },
+      "fp2": { "day": "Friday", "date": "2026-05-22", "time": "17:00", "endTime": "18:00" },
+      "fp3": { "day": "Saturday", "date": "2026-05-23", "time": "12:30", "endTime": "13:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-05-23", "time": "16:00", "endTime": "17:00" },
+      "race": { "day": "Sunday", "date": "2026-05-24", "time": "15:00", "endTime": "17:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 9,
+    "country": "Spain",
+    "location": "Barcelona",
+    "circuit": "Circuit de Barcelona-Catalunya",
+    "flag": "🇪🇸",
+    "date": "2026-06-01",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-05-29", "time": "13:30", "endTime": "14:30" },
+      "fp2": { "day": "Friday", "date": "2026-05-29", "time": "17:00", "endTime": "18:00" },
+      "fp3": { "day": "Saturday", "date": "2026-05-30", "time": "12:30", "endTime": "13:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-05-30", "time": "16:00", "endTime": "17:00" },
+      "race": { "day": "Sunday", "date": "2026-06-01", "time": "15:00", "endTime": "17:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 10,
+    "country": "Canada",
+    "location": "Montreal",
+    "circuit": "Circuit Gilles Villeneuve",
+    "flag": "🇨🇦",
+    "date": "2026-06-14",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-06-12", "time": "13:30", "endTime": "14:30" },
+      "fp2": { "day": "Friday", "date": "2026-06-12", "time": "17:00", "endTime": "18:00" },
+      "fp3": { "day": "Saturday", "date": "2026-06-13", "time": "12:30", "endTime": "13:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-06-13", "time": "16:00", "endTime": "17:00" },
+      "race": { "day": "Sunday", "date": "2026-06-14", "time": "14:00", "endTime": "16:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 11,
+    "country": "Austria",
+    "location": "Spielberg",
+    "circuit": "Red Bull Ring",
+    "flag": "🇦🇹",
+    "date": "2026-06-28",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-06-26", "time": "12:30", "endTime": "13:30" },
+      "sprintQualifying": { "day": "Friday", "date": "2026-06-26", "time": "17:00", "endTime": "17:45" },
+      "sprintRace": { "day": "Saturday", "date": "2026-06-27", "time": "12:00", "endTime": "13:00" },
+      "qualifying": { "day": "Saturday", "date": "2026-06-27", "time": "16:00", "endTime": "17:00" },
+      "race": { "day": "Sunday", "date": "2026-06-28", "time": "15:00", "endTime": "17:00" }
+    },
+    "sprint": true
+  },
+  {
+    "round": 12,
+    "country": "Great Britain",
+    "location": "Silverstone",
+    "circuit": "Silverstone Circuit",
+    "flag": "🇬🇧",
+    "date": "2026-07-05",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-07-03", "time": "12:30", "endTime": "13:30" },
+      "fp2": { "day": "Friday", "date": "2026-07-03", "time": "16:00", "endTime": "17:00" },
+      "fp3": { "day": "Saturday", "date": "2026-07-04", "time": "11:30", "endTime": "12:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-07-04", "time": "15:00", "endTime": "16:00" },
+      "race": { "day": "Sunday", "date": "2026-07-05", "time": "15:00", "endTime": "17:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 13,
+    "country": "Belgium",
+    "location": "Spa",
+    "circuit": "Circuit de Spa-Francorchamps",
+    "flag": "🇧🇪",
+    "date": "2026-07-26",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-07-24", "time": "13:30", "endTime": "14:30" },
+      "sprintQualifying": { "day": "Friday", "date": "2026-07-24", "time": "17:30", "endTime": "18:15" },
+      "sprintRace": { "day": "Saturday", "date": "2026-07-25", "time": "12:00", "endTime": "13:00" },
+      "qualifying": { "day": "Saturday", "date": "2026-07-25", "time": "16:00", "endTime": "17:00" },
+      "race": { "day": "Sunday", "date": "2026-07-26", "time": "15:00", "endTime": "17:00" }
+    },
+    "sprint": true
+  },
+  {
+    "round": 14,
+    "country": "Hungary",
+    "location": "Budapest",
+    "circuit": "Hungaroring",
+    "flag": "🇭🇺",
+    "date": "2026-08-02",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-07-31", "time": "13:30", "endTime": "14:30" },
+      "fp2": { "day": "Friday", "date": "2026-07-31", "time": "17:00", "endTime": "18:00" },
+      "fp3": { "day": "Saturday", "date": "2026-08-01", "time": "12:30", "endTime": "13:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-08-01", "time": "16:00", "endTime": "17:00" },
+      "race": { "day": "Sunday", "date": "2026-08-02", "time": "15:00", "endTime": "17:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 15,
+    "country": "Netherlands",
+    "location": "Zandvoort",
+    "circuit": "Circuit Zandvoort",
+    "flag": "🇳🇱",
+    "date": "2026-08-30",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-08-28", "time": "12:30", "endTime": "13:30" },
+      "fp2": { "day": "Friday", "date": "2026-08-28", "time": "16:00", "endTime": "17:00" },
+      "fp3": { "day": "Saturday", "date": "2026-08-29", "time": "11:30", "endTime": "12:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-08-29", "time": "15:00", "endTime": "16:00" },
+      "race": { "day": "Sunday", "date": "2026-08-30", "time": "15:00", "endTime": "17:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 16,
+    "country": "Italy",
+    "location": "Monza",
+    "circuit": "Autodromo Nazionale Monza",
+    "flag": "🇮🇹",
+    "date": "2026-09-06",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-09-04", "time": "13:30", "endTime": "14:30" },
+      "fp2": { "day": "Friday", "date": "2026-09-04", "time": "17:00", "endTime": "18:00" },
+      "fp3": { "day": "Saturday", "date": "2026-09-05", "time": "12:30", "endTime": "13:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-09-05", "time": "16:00", "endTime": "17:00" },
+      "race": { "day": "Sunday", "date": "2026-09-06", "time": "15:00", "endTime": "17:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 17,
+    "country": "Azerbaijan",
+    "location": "Baku",
+    "circuit": "Baku City Circuit",
+    "flag": "🇦🇿",
+    "date": "2026-09-20",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-09-18", "time": "13:30", "endTime": "14:30" },
+      "fp2": { "day": "Friday", "date": "2026-09-18", "time": "17:00", "endTime": "18:00" },
+      "fp3": { "day": "Saturday", "date": "2026-09-19", "time": "12:30", "endTime": "13:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-09-19", "time": "16:00", "endTime": "17:00" },
+      "race": { "day": "Sunday", "date": "2026-09-20", "time": "15:00", "endTime": "17:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 18,
+    "country": "Singapore",
+    "location": "Singapore",
+    "circuit": "Marina Bay Street Circuit",
+    "flag": "🇸🇬",
+    "date": "2026-10-04",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-10-02", "time": "17:30", "endTime": "18:30" },
+      "sprintQualifying": { "day": "Friday", "date": "2026-10-02", "time": "21:30", "endTime": "22:15" },
+      "sprintRace": { "day": "Saturday", "date": "2026-10-03", "time": "17:00", "endTime": "18:00" },
+      "qualifying": { "day": "Saturday", "date": "2026-10-03", "time": "21:00", "endTime": "22:00" },
+      "race": { "day": "Sunday", "date": "2026-10-04", "time": "20:00", "endTime": "22:00" }
+    },
+    "sprint": true
+  },
+  {
+    "round": 19,
+    "country": "United States",
+    "location": "Austin",
+    "circuit": "Circuit of the Americas",
+    "flag": "🇺🇸",
+    "date": "2026-10-18",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-10-16", "time": "12:30", "endTime": "13:30" },
+      "sprintQualifying": { "day": "Friday", "date": "2026-10-16", "time": "16:30", "endTime": "17:15" },
+      "sprintRace": { "day": "Saturday", "date": "2026-10-17", "time": "13:00", "endTime": "14:00" },
+      "qualifying": { "day": "Saturday", "date": "2026-10-17", "time": "17:00", "endTime": "18:00" },
+      "race": { "day": "Sunday", "date": "2026-10-18", "time": "14:00", "endTime": "16:00" }
+    },
+    "sprint": true
+  },
+  {
+    "round": 20,
+    "country": "Mexico",
+    "location": "Mexico City",
+    "circuit": "Autodromo Hermanos Rodriguez",
+    "flag": "🇲🇽",
+    "date": "2026-10-25",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-10-23", "time": "12:30", "endTime": "13:30" },
+      "fp2": { "day": "Friday", "date": "2026-10-23", "time": "16:00", "endTime": "17:00" },
+      "fp3": { "day": "Saturday", "date": "2026-10-24", "time": "11:30", "endTime": "12:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-10-24", "time": "15:00", "endTime": "16:00" },
+      "race": { "day": "Sunday", "date": "2026-10-25", "time": "14:00", "endTime": "16:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 21,
+    "country": "Brazil",
+    "location": "Sao Paulo",
+    "circuit": "Autodromo Jose Carlos Pace",
+    "flag": "🇧🇷",
+    "date": "2026-11-08",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-11-06", "time": "11:30", "endTime": "12:30" },
+      "sprintQualifying": { "day": "Friday", "date": "2026-11-06", "time": "15:30", "endTime": "16:15" },
+      "sprintRace": { "day": "Saturday", "date": "2026-11-07", "time": "11:00", "endTime": "12:00" },
+      "qualifying": { "day": "Saturday", "date": "2026-11-07", "time": "15:00", "endTime": "16:00" },
+      "race": { "day": "Sunday", "date": "2026-11-08", "time": "14:00", "endTime": "16:00" }
+    },
+    "sprint": true
+  },
+  {
+    "round": 22,
+    "country": "Las Vegas",
+    "location": "Las Vegas",
+    "circuit": "Las Vegas Strip Circuit",
+    "flag": "🇺🇸",
+    "date": "2026-11-21",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-11-19", "time": "18:30", "endTime": "19:30" },
+      "fp2": { "day": "Friday", "date": "2026-11-19", "time": "22:00", "endTime": "23:00" },
+      "fp3": { "day": "Saturday", "date": "2026-11-20", "time": "18:30", "endTime": "19:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-11-20", "time": "22:00", "endTime": "23:00" },
+      "race": { "day": "Sunday", "date": "2026-11-21", "time": "22:00", "endTime": "00:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 23,
+    "country": "Qatar",
+    "location": "Lusail",
+    "circuit": "Lusail International Circuit",
+    "flag": "🇶🇦",
+    "date": "2026-11-29",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-11-27", "time": "14:30", "endTime": "15:30" },
+      "fp2": { "day": "Friday", "date": "2026-11-27", "time": "18:00", "endTime": "19:00" },
+      "fp3": { "day": "Saturday", "date": "2026-11-28", "time": "15:30", "endTime": "16:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-11-28", "time": "19:00", "endTime": "20:00" },
+      "race": { "day": "Sunday", "date": "2026-11-29", "time": "19:00", "endTime": "21:00" }
+    },
+    "sprint": false
+  },
+  {
+    "round": 24,
+    "country": "Abu Dhabi",
+    "location": "Yas Marina",
+    "circuit": "Yas Marina Circuit",
+    "flag": "🇦🇪",
+    "date": "2026-12-06",
+    "sessions": {
+      "fp1": { "day": "Friday", "date": "2026-12-04", "time": "13:30", "endTime": "14:30" },
+      "fp2": { "day": "Friday", "date": "2026-12-04", "time": "17:00", "endTime": "18:00" },
+      "fp3": { "day": "Saturday", "date": "2026-12-05", "time": "14:30", "endTime": "15:30" },
+      "qualifying": { "day": "Saturday", "date": "2026-12-05", "time": "18:00", "endTime": "19:00" },
+      "race": { "day": "Sunday", "date": "2026-12-06", "time": "17:00", "endTime": "19:00" }
+    },
+    "sprint": false
+  }
+]

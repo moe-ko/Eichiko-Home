@@ -1,15 +1,17 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { getLondonWeather } from '$lib/api/weather';
+  import { flip } from 'svelte/animate';
+  import { dndzone } from 'svelte-dnd-action';
   import { getAllLineStatusByMode, getStopArrivals } from '$lib/api/tfl';
   import { getDepartures, type TrainService } from '$lib/api/rail';
   import { getUpcomingEvents, type CalendarEvent } from '$lib/api/calendar';
   import { TUBE_LINES } from '$lib/constants/lines';
+  import { loadPanels, savePanels } from '$lib/stores/transport';
+  import type { TransportPanel } from '$lib/types/transport';
+  import AddStopModal from '$lib/components/AddStopModal.svelte';
 
-  let weather: any = $state(null);
   let tflStatuses: any[] = $state([]);
   let railStatuses: any[] = $state([]);
-  let weatherError = $state('');
   let lineError = $state('');
   let railError = $state('');
   let lineStatusCollapsed = $state(true);
@@ -21,115 +23,33 @@
     expandedEvents[key] = !expandedEvents[key];
   }
 
-  const BUS_STOPS = [
-    { label: 'Bexley Road / Glenesk Road (Stop AF)', id: '490007227W' },
-    { label: 'Southend Crescent / Wythens Walk (Stop B)', id: '490012279S1' },
-  ];
+  let panels: TransportPanel[] = $state([]);
+  let editMode = $state(false);
+  let showAddModal = $state(false);
 
-  let stopArrivals: Record<string, any[]> = $state(Object.fromEntries(BUS_STOPS.map(s => [s.id, []])));
+  let stopArrivals: Record<string, any[]> = $state({});
   let stopErrors: Record<string, string> = $state({});
 
-  const TRAIN_STATIONS = [
-    { label: 'New Eltham Station', crs: 'NEH', platform: '1' },
-    { label: 'Eltham Station', crs: 'ELW', platform: '1' },
-  ];
+  let trainData: Record<string, { departures: TrainService[]; error: string; loading: boolean }> = $state({});
 
-  let trainData: Record<string, { departures: TrainService[]; error: string; loading: boolean }> = $state({
-    NEH: { departures: [], error: '', loading: true },
-    ELW: { departures: [], error: '', loading: true },
-  });
+  // Platform dropdown state
+  let platformDropdownOpen: string | null = $state(null);
 
   let interval: ReturnType<typeof setInterval>;
-  let now = $state(new Date());
-  let clockInterval: ReturnType<typeof setInterval>;
-  let phraseInterval: ReturnType<typeof setInterval>;
-  let weatherPhrase = $state('');
-
-  const WEATHER_PHRASES: Record<string, string[]> = {
-    hot: [
-      "love, it's roasting out there please put on some suncream",
-      "oh my god it's so hot today wear something light ok",
-      "seriously don't forget water it's way too hot out there",
-      "going out? you won't need a jacket trust me it's boiling",
-    ],
-    sunny: [
-      "it's actually really nice out today",
-      "proper lovely weather you should go for a walk",
-      "sunshine all day enjoy it while it lasts",
-      "you should get out today it's beautiful",
-    ],
-    cloudy: [
-      "bit grey out but should stay dry so you'll be fine",
-      "cloudy but no rain nothing to worry about",
-      "not the nicest day but at least it's dry",
-      "a bit dull out there but no need for an umbrella",
-    ],
-    drizzle: [
-      "just a little drizzle out maybe throw a jacket on",
-      "spitting a bit out there not too bad though",
-      "bit damp a light coat should be enough",
-      "might want to grab a hoodie just in case",
-    ],
-    rain: [
-      "love, seriously take your umbrella today",
-      "don't even think about leaving without an umbrella",
-      "it's proper raining out there you'll get soaked",
-      "take your umbrella I'm not gonna say it twice",
-    ],
-    heavyrain: [
-      "it is absolutely pouring out there umbrella is not optional",
-      "you will get completely drenched without an umbrella please take one",
-      "it's really bad out there umbrella and a waterproof if you have one",
-      "love, please take an umbrella it's chucking it down",
-    ],
-    thunderstorm: [
-      "there's a proper storm out there please be careful",
-      "lightning and everything out there try to stay indoors if you can",
-      "seriously wild weather today please take care",
-      "love, it's really rough out there stay safe ok",
-    ],
-    snow: [
-      "love, it's snowing out there wrap up warm",
-      "snow on the ground watch your step it might be slippery",
-      "it's actually snowing dress warm and take it slow",
-      "proper winter weather today make sure you're all wrapped up",
-    ],
-    fog: [
-      "really foggy out there take it easy on the road",
-      "can barely see anything out there be careful",
-      "visibility is terrible this morning drive safe",
-      "so misty out there hopefully it'll clear up soon",
-    ],
-  };
-
-  function getWeatherCategory(w: any): string {
-    const id = w.weather[0].id as number;
-    const temp = w.main.temp;
-    if (id >= 200 && id < 300) return 'thunderstorm';
-    if (id >= 300 && id < 400) return 'drizzle';
-    if (id >= 500 && id < 502) return 'rain';
-    if (id >= 502 && id < 600) return 'heavyrain';
-    if (id >= 600 && id < 700) return 'snow';
-    if (id >= 700 && id < 800) return 'fog';
-    if (id === 800) return temp >= 25 ? 'hot' : 'sunny';
-    return 'cloudy';
-  }
-
-  function pickPhrase(w: any): string {
-    const cat = getWeatherCategory(w);
-    const phrases = WEATHER_PHRASES[cat];
-    return phrases[Math.floor(Math.random() * phrases.length)];
-  }
 
   onMount(() => {
-    loadWeather();
+    panels = loadPanels();
+    // Initialize data state for each panel
+    for (const p of panels) {
+      if (p.type === 'bus' && p.stopId) {
+        stopArrivals[p.stopId] = [];
+      } else if (p.type === 'train' && p.crs) {
+        trainData[p.crs] = { departures: [], error: '', loading: true };
+      }
+    }
     loadLineStatus();
     fetchAllData();
     interval = setInterval(fetchAllData, 30000);
-    clockInterval = setInterval(() => { now = new Date(); }, 1000);
-    phraseInterval = setInterval(() => {
-      if (weather) weatherPhrase = pickPhrase(weather);
-    }, 12000);
 
     function handleVisibility() {
       if (document.hidden) {
@@ -148,18 +68,7 @@
 
   onDestroy(() => {
     clearInterval(interval);
-    clearInterval(clockInterval);
-    clearInterval(phraseInterval);
   });
-
-  async function loadWeather() {
-    try {
-      weather = await getLondonWeather();
-      weatherPhrase = pickPhrase(weather);
-    } catch (e: any) {
-      weatherError = e.message;
-    }
-  }
 
   async function loadLineStatus() {
     await Promise.all([
@@ -187,29 +96,91 @@
   }
 
   async function fetchBusArrivals() {
-    await Promise.all(BUS_STOPS.map(async (stop) => {
+    const busPanels = panels.filter(p => p.type === 'bus' && p.stopId);
+    await Promise.all(busPanels.map(async (panel) => {
+      const stopId = panel.stopId!;
       try {
-        const data = await getStopArrivals(stop.id);
-        stopArrivals[stop.id] = data
+        const data = await getStopArrivals(stopId);
+        stopArrivals[stopId] = data
           .sort((a: any, b: any) => a.timeToStation - b.timeToStation)
           .slice(0, 8);
-        stopErrors[stop.id] = '';
+        stopErrors[stopId] = '';
       } catch (e: any) {
-        stopErrors[stop.id] = e.message;
+        stopErrors[stopId] = e.message;
       }
     }));
   }
 
   async function fetchTrainDepartures() {
-    await Promise.all(TRAIN_STATIONS.map(async (station) => {
+    const trainPanels = panels.filter(p => p.type === 'train' && p.crs);
+    await Promise.all(trainPanels.map(async (panel) => {
+      const crs = panel.crs!;
       try {
-        const data = await getDepartures(station.crs, 8, station.platform);
-        trainData[station.crs] = { departures: data, error: '', loading: false };
+        const data = await getDepartures(crs, 8, panel.platform ?? null);
+        trainData[crs] = { departures: data, error: '', loading: false };
       } catch (e: any) {
-        trainData[station.crs] = { departures: [], error: e.message, loading: false };
+        trainData[crs] = { departures: [], error: e.message, loading: false };
       }
     }));
   }
+
+  function addPanel(newPanel: Omit<TransportPanel, 'id'>) {
+    const panel: TransportPanel = { ...newPanel, id: crypto.randomUUID() };
+    panels = [...panels, panel];
+    // Initialize data state
+    if (panel.type === 'bus' && panel.stopId) {
+      stopArrivals[panel.stopId] = [];
+    } else if (panel.type === 'train' && panel.crs) {
+      trainData[panel.crs] = { departures: [], error: '', loading: true };
+    }
+    savePanels(panels);
+    showAddModal = false;
+    // Fetch data for the new panel immediately
+    if (panel.type === 'bus' && panel.stopId) {
+      getStopArrivals(panel.stopId).then(data => {
+        stopArrivals[panel.stopId!] = data
+          .sort((a: any, b: any) => a.timeToStation - b.timeToStation)
+          .slice(0, 8);
+      }).catch(() => {});
+    } else if (panel.type === 'train' && panel.crs) {
+      getDepartures(panel.crs, 8, panel.platform ?? null).then(data => {
+        trainData[panel.crs!] = { departures: data, error: '', loading: false };
+      }).catch(() => {});
+    }
+  }
+
+  function removePanel(id: string) {
+    panels = panels.filter(p => p.id !== id);
+    savePanels(panels);
+    if (panels.length === 0) editMode = false;
+  }
+
+  function handleDndConsider(e: CustomEvent<{ items: TransportPanel[] }>) {
+    panels = e.detail.items;
+  }
+
+  function handleDndFinalize(e: CustomEvent<{ items: TransportPanel[] }>) {
+    panels = e.detail.items;
+    savePanels(panels);
+  }
+
+  function changePlatform(panelId: string, platform: string | null) {
+    panels = panels.map(p => p.id === panelId ? { ...p, platform } : p);
+    savePanels(panels);
+    platformDropdownOpen = null;
+    // Re-fetch for that station
+    const panel = panels.find(p => p.id === panelId);
+    if (panel?.crs) {
+      trainData[panel.crs] = { departures: [], error: '', loading: true };
+      getDepartures(panel.crs, 8, platform).then(data => {
+        trainData[panel.crs!] = { departures: data, error: '', loading: false };
+      }).catch((e: any) => {
+        trainData[panel.crs!] = { departures: [], error: e.message, loading: false };
+      });
+    }
+  }
+
+  const FLIP_DURATION_MS = 200;
 
   async function fetchAppointments() {
     try {
@@ -230,10 +201,6 @@
     return line?.color ?? '#aaaaaa';
   }
 
-  function formatTime(date: Date): string {
-    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  }
-
   function formatEventTime(iso: string): string {
     const d = new Date(iso);
     const now = new Date();
@@ -250,218 +217,235 @@
   }
 </script>
 
-<svelte:head>
-  <title>Eichiko's Home</title>
-</svelte:head>
-
-<div class="led-board">
-  <!-- Header -->
-  <div class="board-header">
-    <div class="header-left">
-      <span class="header-title">EICHIKO'S HOME</span>
-    </div>
-    <div class="header-right">
-      <span class="header-location">GREENWICH, UK</span>
-      <span class="header-time">{formatTime(now)}</span>
-    </div>
-  </div>
-
-  <!-- Weather Bar -->
-  <div class="weather-bar">
-    {#if weather}
-      <span class="weather-icon">
-        {#if weather.weather[0].main === 'Clouds'}&#9729;{:else if weather.weather[0].main === 'Rain'}&#9730;{:else if weather.weather[0].main === 'Clear'}&#9728;{:else if weather.weather[0].main === 'Snow'}&#10052;{:else if weather.weather[0].main === 'Thunderstorm'}&#9928;{:else}&#9729;{/if}
+<!-- Grid layout for tablet -->
+<div class="board-grid">
+  <!-- Line Status (collapsible) -->
+  <div class="board-section grid-full">
+    <button class="section-header section-toggle" onclick={() => lineStatusCollapsed = !lineStatusCollapsed}>
+      <span class="section-title-group">
+        <span>LINE STATUS</span>
+        <span class="tap-hint">TAP TO {lineStatusCollapsed ? 'EXPAND' : 'COLLAPSE'}</span>
       </span>
-      <span class="weather-temp">{Math.round(weather.main.temp)}°C</span>
-      <span class="weather-desc">{weather.weather[0].description.toUpperCase()}</span>
-      <span class="weather-sep">|</span>
-      <span class="weather-pop">&#9748; {Math.round((weather.pop ?? 0) * 100)}% rain</span>
-      <span class="weather-sep">|</span>
-      <span class="weather-phrase">{weatherPhrase}</span>
-    {:else if weatherError}
-      <span class="weather-error">{weatherError}</span>
-    {:else}
-      <span class="weather-loading">LOADING WEATHER...</span>
+      <span class="toggle-icon">{lineStatusCollapsed ? '▶' : '▼'}</span>
+    </button>
+    {#if !lineStatusCollapsed}
+      <div class="line-status-grid">
+        <!-- TFL Lines -->
+        <div class="line-status-col">
+          <div class="col-header-row col-header-tfl">
+            <span class="col-line">TFL LINE</span>
+            <span class="col-status">STATUS</span>
+          </div>
+          {#if lineError}
+            <div class="led-row"><span class="error-text">{lineError}</span></div>
+          {:else if tflStatuses.length === 0}
+            <div class="led-row"><span class="loading-text">LOADING...</span></div>
+          {:else}
+            {#each tflStatuses as line, i}
+              {@const status = line.lineStatuses?.[0]?.statusSeverityDescription ?? 'Unknown'}
+              <div class="led-row" class:row-alt={i % 2 === 1}>
+                <span class="col-line line-name" style="color: {getLineColor(line.id)}">{line.name.toUpperCase()}</span>
+                <span class="line-dots"></span>
+                <span class="col-status" class:status-good={status === 'Good Service'} class:status-delay={status !== 'Good Service' && status !== 'Unknown'}>{status.toUpperCase()}</span>
+              </div>
+            {/each}
+          {/if}
+        </div>
+        <!-- National Rail -->
+        <div class="line-status-col">
+          <div class="col-header-row col-header-rail">
+            <span class="col-line">NATIONAL RAIL</span>
+            <span class="col-status">STATUS</span>
+          </div>
+          {#if railError}
+            <div class="led-row"><span class="error-text">{railError}</span></div>
+          {:else if railStatuses.length === 0}
+            <div class="led-row"><span class="loading-text">LOADING...</span></div>
+          {:else}
+            {#each railStatuses as line, i}
+              {@const status = line.lineStatuses?.[0]?.statusSeverityDescription ?? 'Unknown'}
+              <div class="led-row" class:row-alt={i % 2 === 1}>
+                <span class="col-line" style="color: #ccc">{line.name.toUpperCase()}</span>
+                <span class="line-dots"></span>
+                <span class="col-status" class:status-good={status === 'Good Service'} class:status-delay={status !== 'Good Service' && status !== 'Unknown'}>{status.toUpperCase()}</span>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      </div>
     {/if}
   </div>
 
-  <!-- Grid layout for tablet -->
-  <div class="board-grid">
-    <!-- Line Status (collapsible) -->
-    <div class="board-section grid-full">
-      <button class="section-header section-toggle" onclick={() => lineStatusCollapsed = !lineStatusCollapsed}>
-        <span class="section-title-group">
-          <span>LINE STATUS</span>
-          <span class="tap-hint">TAP TO {lineStatusCollapsed ? 'EXPAND' : 'COLLAPSE'}</span>
-        </span>
-        <span class="toggle-icon">{lineStatusCollapsed ? '▶' : '▼'}</span>
-      </button>
-      {#if !lineStatusCollapsed}
-        <div class="line-status-grid">
-          <!-- TFL Lines -->
-          <div class="line-status-col">
-            <div class="col-header-row col-header-tfl">
-              <span class="col-line">TFL LINE</span>
-              <span class="col-status">STATUS</span>
-            </div>
-            {#if lineError}
-              <div class="led-row"><span class="error-text">{lineError}</span></div>
-            {:else if tflStatuses.length === 0}
-              <div class="led-row"><span class="loading-text">LOADING...</span></div>
-            {:else}
-              {#each tflStatuses as line, i}
-                {@const status = line.lineStatuses?.[0]?.statusSeverityDescription ?? 'Unknown'}
-                <div class="led-row" class:row-alt={i % 2 === 1}>
-                  <span class="col-line line-name" style="color: {getLineColor(line.id)}">{line.name.toUpperCase()}</span>
-                  <span class="line-dots"></span>
-                  <span class="col-status" class:status-good={status === 'Good Service'} class:status-delay={status !== 'Good Service' && status !== 'Unknown'}>{status.toUpperCase()}</span>
-                </div>
-              {/each}
-            {/if}
-          </div>
-          <!-- National Rail -->
-          <div class="line-status-col">
-            <div class="col-header-row col-header-rail">
-              <span class="col-line">NATIONAL RAIL</span>
-              <span class="col-status">STATUS</span>
-            </div>
-            {#if railError}
-              <div class="led-row"><span class="error-text">{railError}</span></div>
-            {:else if railStatuses.length === 0}
-              <div class="led-row"><span class="loading-text">LOADING...</span></div>
-            {:else}
-              {#each railStatuses as line, i}
-                {@const status = line.lineStatuses?.[0]?.statusSeverityDescription ?? 'Unknown'}
-                <div class="led-row" class:row-alt={i % 2 === 1}>
-                  <span class="col-line" style="color: #ccc">{line.name.toUpperCase()}</span>
-                  <span class="line-dots"></span>
-                  <span class="col-status" class:status-good={status === 'Good Service'} class:status-delay={status !== 'Good Service' && status !== 'Unknown'}>{status.toUpperCase()}</span>
-                </div>
-              {/each}
-            {/if}
-          </div>
-        </div>
-      {/if}
+  <!-- Appointments -->
+  <div class="board-section grid-full appointments">
+    <div class="section-header">
+      <span class="section-type-badge badge-calendar">APPOINTMENTS</span>
+      <span class="tap-hint">TAP AN EVENT FOR DETAILS</span>
     </div>
-
-    <!-- Appointments -->
-    <div class="board-section grid-full appointments">
-      <div class="section-header">
-        <span class="section-type-badge badge-calendar">APPOINTMENTS</span>
-        <span class="tap-hint">TAP AN EVENT FOR DETAILS</span>
-      </div>
-      <div class="col-header-row col-header-yellow">
-        <span class="col-time">TIME</span>
-        <span class="col-event">EVENT</span>
-      </div>
-      {#if appointmentsError}
-        <div class="led-row"><span class="error-text">{appointmentsError}</span></div>
-      {:else if appointments.length === 0}
-        <div class="led-row"><span class="loading-text">NO UPCOMING EVENTS</span></div>
-      {:else}
-        {#each appointments as evt, i}
-          {@const hasDetails = !!(evt.location || evt.description)}
-          {@const isExpanded = expandedEvents[evt.start] === true}
-          {#if hasDetails}
-            <button
-              type="button"
-              class="led-row event-row"
-              class:row-alt={i % 2 === 1}
-              onclick={() => toggleEvent(evt.start)}
-            >
-              <span class="col-time led-yellow">{formatEventTime(evt.start)}</span>
-              <span class="col-event led-yellow">{evt.summary.toUpperCase()}</span>
-              <span class="event-chevron">{isExpanded ? '▼' : '▶'}</span>
-            </button>
-          {:else}
-            <div class="led-row" class:row-alt={i % 2 === 1}>
-              <span class="col-time led-yellow">{formatEventTime(evt.start)}</span>
-              <span class="col-event led-yellow">{evt.summary.toUpperCase()}</span>
-            </div>
-          {/if}
-          {#if hasDetails && isExpanded}
-            <div class="led-sub-row" class:row-alt={i % 2 === 1}>
-              {#if evt.location}
-                <div class="sub-line">
-                  <span class="sub-label">LOCATION:</span>
-                  <span class="sub-value sub-value-upper">{evt.location}</span>
-                </div>
-              {/if}
-              {#if evt.description}
-                <div class="sub-line">
-                  <span class="sub-label">DESCRIPTION:</span>
-                  <span class="sub-value">{evt.description}</span>
-                </div>
-              {/if}
-            </div>
-          {/if}
-        {/each}
-      {/if}
+    <div class="col-header-row col-header-yellow">
+      <span class="col-time">TIME</span>
+      <span class="col-event">EVENT</span>
     </div>
-
-    <!-- Bus Arrivals -->
-    {#each BUS_STOPS as stop}
-      <div class="board-section grid-half">
-        <div class="section-header">
-          <span class="section-type-badge badge-bus">BUS</span>
-          <span>{stop.label.toUpperCase()}</span>
-        </div>
-        <div class="col-header-row col-header-yellow">
-          <span class="col-route">ROUTE</span>
-          <span class="col-dest">DESTINATION</span>
-          <span class="col-mins">MINS</span>
-        </div>
-        {#if stopErrors[stop.id]}
-          <div class="led-row"><span class="error-text">{stopErrors[stop.id]}</span></div>
-        {:else if stopArrivals[stop.id].length === 0}
-          <div class="led-row"><span class="loading-text">AWAITING DATA...</span></div>
+    {#if appointmentsError}
+      <div class="led-row"><span class="error-text">{appointmentsError}</span></div>
+    {:else if appointments.length === 0}
+      <div class="led-row"><span class="loading-text">NO UPCOMING EVENTS</span></div>
+    {:else}
+      {#each appointments as evt, i}
+        {@const hasDetails = !!(evt.location || evt.description)}
+        {@const isExpanded = expandedEvents[evt.start] === true}
+        {#if hasDetails}
+          <button
+            type="button"
+            class="led-row event-row"
+            class:row-alt={i % 2 === 1}
+            onclick={() => toggleEvent(evt.start)}
+          >
+            <span class="col-time led-yellow">{formatEventTime(evt.start)}</span>
+            <span class="col-event led-yellow">{evt.summary.toUpperCase()}</span>
+            <span class="event-chevron">{isExpanded ? '▼' : '▶'}</span>
+          </button>
         {:else}
-          {#each stopArrivals[stop.id] as arrival, i}
-            {@const mins = formatMins(arrival.timeToStation)}
-            <div class="led-row" class:row-alt={i % 2 === 1}>
-              <span class="col-route led-bold led-yellow">{arrival.lineName}</span>
-              <span class="col-dest led-yellow">{(arrival.towards ?? arrival.destinationName).toUpperCase()}</span>
-              <span class="col-mins" class:due-blink={mins === 'DUE'} class:due-text={mins === 'DUE'}>{mins}</span>
-            </div>
-          {/each}
+          <div class="led-row" class:row-alt={i % 2 === 1}>
+            <span class="col-time led-yellow">{formatEventTime(evt.start)}</span>
+            <span class="col-event led-yellow">{evt.summary.toUpperCase()}</span>
+          </div>
         {/if}
-      </div>
-    {/each}
+        {#if hasDetails && isExpanded}
+          <div class="led-sub-row" class:row-alt={i % 2 === 1}>
+            {#if evt.location}
+              <div class="sub-line">
+                <span class="sub-label">LOCATION:</span>
+                <span class="sub-value sub-value-upper">{evt.location}</span>
+              </div>
+            {/if}
+            {#if evt.description}
+              <div class="sub-line">
+                <span class="sub-label">DESCRIPTION:</span>
+                <span class="sub-value">{evt.description}</span>
+              </div>
+            {/if}
+          </div>
+        {/if}
+      {/each}
+    {/if}
+  </div>
 
-    <!-- Train Departures -->
-    {#each TRAIN_STATIONS as station}
-      {@const td = trainData[station.crs]}
-      <div class="board-section grid-half">
-        <div class="section-header">
-          <span class="section-type-badge badge-train">TRAIN</span>
-          <span>{station.label.toUpperCase()}{station.platform ? ` — PLATFORM ${station.platform}` : ''}</span>
-        </div>
-        <div class="col-header-row col-header-yellow">
-          <span class="col-time">TIME</span>
-          <span class="col-train-dest">DESTINATION</span>
-          <span class="col-train-status">STATUS</span>
-          <span class="col-plat">PLAT</span>
-        </div>
-        {#if td.error}
-          <div class="led-row"><span class="error-text">{td.error}</span></div>
-        {:else if td.loading}
-          <div class="led-row"><span class="loading-text">AWAITING DATA...</span></div>
-        {:else if td.departures.length === 0}
-          <div class="led-row"><span class="loading-text">NO DEPARTURES</span></div>
+  <!-- Transport Section Header -->
+  <div class="transport-header grid-full">
+    <span class="transport-title">TRANSPORT</span>
+    {#if editMode}
+      <button class="edit-done-btn" onclick={() => { editMode = false; }}>DONE</button>
+    {:else}
+      <button class="edit-toggle-btn" onclick={() => { editMode = true; }}>&#8942;</button>
+    {/if}
+  </div>
+
+  <!-- DnD Transport Panels -->
+  <div
+    class="transport-zone grid-full"
+    use:dndzone={{ items: panels, flipDurationMs: FLIP_DURATION_MS, type: 'transport' }}
+    onconsider={handleDndConsider}
+    onfinalize={handleDndFinalize}
+  >
+    {#each panels as panel (panel.id)}
+      <div class="board-section" animate:flip={{ duration: FLIP_DURATION_MS }}>
+        {#if panel.type === 'bus'}
+          <!-- Bus Panel -->
+          <div class="section-header">
+            {#if editMode}
+              <button class="remove-btn" onclick={() => removePanel(panel.id)}>&#10005;</button>
+            {/if}
+            <span class="section-type-badge badge-bus">BUS</span>
+            {#if /\(stop [a-z0-9]+\)/i.test(panel.label)}
+              <span class="section-type-badge badge-stop-letter">
+                {panel.label.match(/\(stop ([a-z0-9]+)\)/i)?.[1].toUpperCase()}
+              </span>
+            {/if}
+            <span class="section-label">{panel.label.replace(/\s*\(stop [a-z0-9]+\)/i, '').toUpperCase()}</span>
+          </div>
+          <div class="col-header-row col-header-yellow">
+            <span class="col-route">ROUTE</span>
+            <span class="col-dest">DESTINATION</span>
+            <span class="col-mins">MINS</span>
+          </div>
+          {#if stopErrors[panel.stopId!]}
+            <div class="led-row"><span class="error-text">{stopErrors[panel.stopId!]}</span></div>
+          {:else if (stopArrivals[panel.stopId!] ?? []).length === 0}
+            <div class="led-row"><span class="loading-text">AWAITING DATA...</span></div>
+          {:else}
+            {#each stopArrivals[panel.stopId!] as arrival, i}
+              {@const mins = formatMins(arrival.timeToStation)}
+              <div class="led-row" class:row-alt={i % 2 === 1}>
+                <span class="col-route led-bold led-yellow">{arrival.lineName}</span>
+                <span class="col-dest led-yellow">{(([arrival.towards, arrival.destinationName].find(v => v && v !== 'null')) || '—').toUpperCase()}</span>
+                <span class="col-mins" class:due-blink={mins === 'DUE'} class:due-text={mins === 'DUE'}>{mins}</span>
+              </div>
+            {/each}
+          {/if}
         {:else}
-          {#each td.departures as svc, i}
-            <div class="led-row" class:row-alt={i % 2 === 1}>
-              <span class="col-time led-yellow">{svc.std}</span>
-              <span class="col-train-dest led-yellow">{svc.destination.toUpperCase()}</span>
-              <span class="col-train-status" class:status-good={svc.etd === 'On time'} class:status-delay={svc.etd !== 'On time'}>{svc.etd.toUpperCase()}</span>
-              <span class="col-plat">{svc.platform ?? '-'}</span>
-            </div>
-          {/each}
+          <!-- Train Panel -->
+          {@const td = trainData[panel.crs!] ?? { departures: [], error: '', loading: true }}
+          <div class="section-header">
+            {#if editMode}
+              <button class="remove-btn" onclick={() => removePanel(panel.id)}>&#10005;</button>
+            {/if}
+            <span class="section-type-badge badge-train">TRAIN</span>
+            <span class="section-label">{panel.label.toUpperCase()}</span>
+            <span class="section-label-sep">—</span>
+            <span class="platform-selector" style="position: relative;">
+              <button class="platform-tap" onclick={() => { platformDropdownOpen = platformDropdownOpen === panel.id ? null : panel.id; }}>
+                {panel.platform ? `PLATFORM ${panel.platform}` : 'ALL PLATFORMS'}
+                <span class="platform-caret">&#9662;</span>
+              </button>
+              {#if platformDropdownOpen === panel.id}
+                <div class="platform-dropdown">
+                  <button class="plat-option" class:plat-active={panel.platform === null} onclick={() => changePlatform(panel.id, null)}>ALL</button>
+                  <button class="plat-option" class:plat-active={panel.platform === '1'} onclick={() => changePlatform(panel.id, '1')}>1</button>
+                  <button class="plat-option" class:plat-active={panel.platform === '2'} onclick={() => changePlatform(panel.id, '2')}>2</button>
+                  <button class="plat-option" class:plat-active={panel.platform === '3'} onclick={() => changePlatform(panel.id, '3')}>3</button>
+                  <button class="plat-option" class:plat-active={panel.platform === '4'} onclick={() => changePlatform(panel.id, '4')}>4</button>
+                </div>
+              {/if}
+            </span>
+          </div>
+          <div class="col-header-row col-header-yellow">
+            <span class="col-time">TIME</span>
+            <span class="col-train-dest">DESTINATION</span>
+            <span class="col-train-status">STATUS</span>
+            <span class="col-plat">PLAT</span>
+          </div>
+          {#if td.error}
+            <div class="led-row"><span class="error-text">{td.error}</span></div>
+          {:else if td.loading}
+            <div class="led-row"><span class="loading-text">AWAITING DATA...</span></div>
+          {:else if td.departures.length === 0}
+            <div class="led-row"><span class="loading-text">NO DEPARTURES</span></div>
+          {:else}
+            {#each td.departures as svc, i}
+              <div class="led-row" class:row-alt={i % 2 === 1}>
+                <span class="col-time led-yellow">{svc.std}</span>
+                <span class="col-train-dest led-yellow">{svc.destination.toUpperCase()}</span>
+                <span class="col-train-status" class:status-good={svc.etd === 'On time'} class:status-delay={svc.etd !== 'On time'}>{svc.etd.toUpperCase()}</span>
+                <span class="col-plat">{svc.platform ?? '-'}</span>
+              </div>
+            {/each}
+          {/if}
         {/if}
       </div>
     {/each}
   </div>
+
+  <!-- Add Stop Card (outside DnD zone) -->
+  <button class="add-card grid-full" onclick={() => { showAddModal = true; }}>
+    <span class="add-card-text">+ ADD STOP</span>
+  </button>
 </div>
+
+<!-- Add Stop Modal -->
+{#if showAddModal}
+  <AddStopModal onAdd={addPanel} onClose={() => { showAddModal = false; }} />
+{/if}
 
 <style>
   /* ── LED Blink Animation ── */
@@ -472,111 +456,6 @@
 
   .due-blink {
     animation: led-blink 1.5s ease-in-out infinite;
-  }
-
-  /* ── Board Shell ── */
-  .led-board {
-    min-height: 100vh;
-    background: #0a0a0a;
-    color: #FF6A00;
-    font-family: 'LED Dot-Matrix', monospace;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    padding: 0;
-  }
-
-  /* ── Header ── */
-  .board-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 24px;
-    background: #111;
-    border-bottom: 3px solid #FFD600;
-    font-family: 'Share Tech Mono', monospace;
-  }
-
-  .header-left {
-    display: flex;
-    align-items: center;
-  }
-
-  .header-title {
-    color: #FFD600;
-    font-size: 1.5rem;
-    font-weight: bold;
-    letter-spacing: 3px;
-  }
-
-  .header-right {
-    display: flex;
-    gap: 24px;
-    align-items: center;
-  }
-
-  .header-location {
-    color: #FFD600;
-    font-size: 0.9rem;
-  }
-
-  .header-time {
-    color: #FFD600;
-    font-size: 1.2rem;
-    font-weight: bold;
-  }
-
-  /* ── Weather Bar ── */
-  .weather-bar {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 24px;
-    background: #111;
-    border-bottom: 2px solid #222;
-    flex-wrap: wrap;
-    font-family: 'Share Tech Mono', monospace;
-  }
-
-  .weather-icon {
-    font-size: 1.6rem;
-    color: #FFD600;
-  }
-
-  .weather-temp {
-    color: #FFFFFF;
-    font-size: 1.3rem;
-    font-weight: bold;
-  }
-
-  .weather-desc {
-    color: #E0E0E0;
-    font-size: 0.9rem;
-  }
-
-  .weather-sep {
-    color: #444;
-    font-size: 0.9rem;
-  }
-
-  .weather-pop {
-    color: #E0E0E0;
-    font-size: 0.9rem;
-  }
-
-  .weather-phrase {
-    color: #E0E0E0;
-    font-size: 0.9rem;
-    text-transform: none;
-  }
-
-  .weather-error {
-    color: #FF3333;
-    font-size: 0.85rem;
-  }
-
-  .weather-loading {
-    color: #888;
-    font-size: 0.85rem;
   }
 
   /* ── Grid Layout ── */
@@ -590,10 +469,6 @@
 
   .grid-full {
     grid-column: 1 / -1;
-  }
-
-  .grid-half {
-    grid-column: span 1;
   }
 
   /* ── Sections (Card Style) ── */
@@ -638,6 +513,13 @@
   .badge-train {
     background: #00AAFF;
     color: #000;
+  }
+
+  .badge-stop-letter {
+    background: #1a1200;
+    color: #FFD600;
+    border: 1px solid #3a2a00;
+    flex-shrink: 0;
   }
 
   /* ── Collapsible Toggle ── */
@@ -860,28 +742,9 @@
     .board-grid {
       grid-template-columns: 1fr;
     }
-    .grid-half {
-      grid-column: 1 / -1;
-    }
   }
 
   @media (max-width: 640px) {
-    .board-header {
-      flex-direction: column;
-      gap: 8px;
-      text-align: center;
-    }
-    .header-right {
-      justify-content: center;
-    }
-    .header-title {
-      font-size: 1.1rem;
-    }
-    .weather-bar {
-      justify-content: center;
-      text-align: center;
-      padding: 10px 12px;
-    }
     .led-row {
       font-size: 0.8rem;
       padding: 8px 12px;
@@ -1026,5 +889,205 @@
 
   .sub-value-upper {
     text-transform: uppercase;
+  }
+
+  /* ── Transport Section Header ── */
+  .transport-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 24px;
+    background: #111;
+    border: 1px solid #2a1a00;
+    border-radius: 6px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .transport-title {
+    color: #FFD600;
+    font-size: 0.85rem;
+    font-weight: bold;
+    letter-spacing: 3px;
+  }
+
+  .edit-toggle-btn {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 4px 10px;
+    line-height: 1;
+    letter-spacing: 0;
+  }
+
+  .edit-toggle-btn:hover {
+    color: #FFD600;
+  }
+
+  .edit-done-btn {
+    background: none;
+    border: 1px solid #FFD600;
+    color: #FFD600;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    padding: 4px 14px;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+
+  .edit-done-btn:hover {
+    background: #1a1200;
+  }
+
+  /* ── Transport DnD Zone ── */
+  .transport-zone {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  /* ── Remove Button ── */
+  .remove-btn {
+    background: none;
+    border: none;
+    color: #FF3333;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0 8px 0 0;
+    line-height: 1;
+    text-shadow: 0 0 8px rgba(255, 51, 51, 0.4);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .remove-btn:hover {
+    color: #FF6666;
+  }
+
+  /* ── Add Card ── */
+  .add-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    border: 2px dashed #2a1a00;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    min-height: 80px;
+  }
+
+  .add-card:hover {
+    border-color: #FFD600;
+    box-shadow: 0 0 15px rgba(255, 214, 0, 0.1);
+  }
+
+  .add-card-text {
+    color: #FFD600;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: bold;
+    letter-spacing: 3px;
+    text-shadow: 0 0 8px rgba(255, 214, 0, 0.3);
+  }
+
+  /* ── Platform Selector ── */
+  .section-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .section-label-sep {
+    flex-shrink: 0;
+    margin: 0 4px;
+  }
+
+  .platform-selector {
+    flex-shrink: 0;
+  }
+
+  .platform-tap {
+    background: none;
+    border: 1px solid #2a1a00;
+    color: #FFD600;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    padding: 3px 10px;
+    cursor: pointer;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .platform-tap:hover {
+    border-color: #FF6A00;
+    background: #1a1200;
+  }
+
+  .platform-caret {
+    font-size: 0.6rem;
+    margin-left: 4px;
+  }
+
+  .platform-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: #111;
+    border: 1px solid #2a1a00;
+    border-radius: 4px;
+    z-index: 100;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    min-width: 60px;
+  }
+
+  .plat-option {
+    background: none;
+    border: none;
+    border-bottom: 1px solid #1a1200;
+    color: #FF6A00;
+    font-family: 'LED Dot-Matrix', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    padding: 8px 14px;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .plat-option:last-child {
+    border-bottom: none;
+  }
+
+  .plat-option:hover {
+    background: #1a1200;
+    color: #FFD600;
+  }
+
+  .plat-option.plat-active {
+    color: #FFD600;
+    background: #1a1200;
+    text-shadow: 0 0 8px rgba(255, 214, 0, 0.4);
+  }
+
+  /* ── DnD visual feedback ── */
+  :global(.transport-zone [aria-grabbed="true"]) {
+    outline: 1px solid #FF6A00;
+    opacity: 0.7;
+    box-shadow: 0 0 20px rgba(255, 106, 0, 0.2);
+  }
+
+  /* ── Responsive overrides for transport zone ── */
+  @media (max-width: 900px) {
+    .transport-zone {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
