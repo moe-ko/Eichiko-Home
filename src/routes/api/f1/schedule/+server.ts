@@ -1,15 +1,18 @@
 import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { isAllowedOrigin, forbidden, upstreamError } from '$lib/server/security';
 
-export async function GET() {
-  const res = await fetch('https://api.jolpi.ca/ergast/f1/2026/races.json');
+export const GET: RequestHandler = async ({ request }) => {
+  if (!isAllowedOrigin(request)) return forbidden();
 
-  if (!res.ok) {
-    return json({ error: `Jolpica API: ${res.status}` }, { status: res.status });
+  try {
+    const res = await fetch('https://api.jolpi.ca/ergast/f1/2026/races.json');
+    if (!res.ok) return upstreamError('jolpica-f1', res.status);
+    const data = await res.json();
+    return json(data, {
+      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+    });
+  } catch (e) {
+    return upstreamError('jolpica-f1', e);
   }
-
-  const data = await res.json();
-
-  return json(data, {
-    headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
-  });
-}
+};

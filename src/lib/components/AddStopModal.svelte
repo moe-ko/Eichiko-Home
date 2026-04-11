@@ -15,6 +15,8 @@
   let busAdding = $state(false);
   let trainResults: { name: string; crs: string }[] = $state([]);
   let selectedStation: { name: string; crs: string } | null = $state(null);
+  let stationPlatforms: string[] = $state([]);
+  let platformsLoading = $state(false);
   let debounceTimer: ReturnType<typeof setTimeout> | null = $state(null);
 
   // Bus stop direction picker (when a parent stop has multiple children)
@@ -72,6 +74,8 @@
     busChildren = [];
     busParentName = '';
     selectedStation = null;
+    stationPlatforms = [];
+    platformsLoading = false;
   }
 
   async function selectBusStop(stop: { id: string; name: string }) {
@@ -107,10 +111,29 @@
   function backToResults() {
     busChildren = [];
     busParentName = '';
+    stationPlatforms = [];
+    platformsLoading = false;
   }
 
-  function selectTrainStation(station: { name: string; crs: string }) {
+  async function selectTrainStation(station: { name: string; crs: string }) {
     selectedStation = station;
+    stationPlatforms = [];
+    platformsLoading = true;
+    try {
+      const res = await fetch(`/api/rail/departures/${station.crs}?numRows=20`);
+      if (res.ok) {
+        const data = await res.json();
+        const seen = new Set<string>();
+        for (const svc of data.trainServices ?? []) {
+          if (svc.platform && !seen.has(svc.platform)) seen.add(svc.platform);
+        }
+        stationPlatforms = [...seen].sort((a, b) => {
+          const na = parseInt(a), nb = parseInt(b);
+          return isNaN(na) || isNaN(nb) ? a.localeCompare(b) : na - nb;
+        });
+      }
+    } catch { /* leave stationPlatforms empty — fallback handles it */ }
+    platformsLoading = false;
   }
 
   function selectPlatform(platform: string | null) {
@@ -190,13 +213,22 @@
       <div class="platform-picker">
         <div class="platform-label">SELECT PLATFORM FOR {selectedStation.name.toUpperCase()}</div>
         <div class="platform-buttons">
-          <button class="plat-btn" onclick={() => selectPlatform(null)}>ALL</button>
-          <button class="plat-btn" onclick={() => selectPlatform('1')}>1</button>
-          <button class="plat-btn" onclick={() => selectPlatform('2')}>2</button>
-          <button class="plat-btn" onclick={() => selectPlatform('3')}>3</button>
-          <button class="plat-btn" onclick={() => selectPlatform('4')}>4</button>
+          {#if platformsLoading}
+            <span class="platform-label" style="font-size: 0.7rem; color: #888;">LOADING PLATFORMS...</span>
+          {:else}
+            <button class="plat-btn" onclick={() => selectPlatform(null)}>ALL</button>
+            {#each stationPlatforms as plat}
+              <button class="plat-btn" onclick={() => selectPlatform(plat)}>{plat}</button>
+            {/each}
+            {#if stationPlatforms.length === 0}
+              <button class="plat-btn" onclick={() => selectPlatform('1')}>1</button>
+              <button class="plat-btn" onclick={() => selectPlatform('2')}>2</button>
+              <button class="plat-btn" onclick={() => selectPlatform('3')}>3</button>
+              <button class="plat-btn" onclick={() => selectPlatform('4')}>4</button>
+            {/if}
+          {/if}
         </div>
-        <button class="back-btn" onclick={() => { selectedStation = null; }}>&#8592; BACK TO RESULTS</button>
+        <button class="back-btn" onclick={() => { selectedStation = null; stationPlatforms = []; platformsLoading = false; }}>&#8592; BACK TO RESULTS</button>
       </div>
     {:else}
       <!-- Search input -->

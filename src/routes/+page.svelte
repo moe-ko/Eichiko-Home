@@ -30,7 +30,7 @@
   let stopArrivals: Record<string, any[]> = $state({});
   let stopErrors: Record<string, string> = $state({});
 
-  let trainData: Record<string, { departures: TrainService[]; error: string; loading: boolean }> = $state({});
+  let trainData: Record<string, { departures: TrainService[]; error: string; loading: boolean; platforms: string[] }> = $state({});
 
   // Platform dropdown state
   let platformDropdownOpen: string | null = $state(null);
@@ -44,7 +44,7 @@
       if (p.type === 'bus' && p.stopId) {
         stopArrivals[p.stopId] = [];
       } else if (p.type === 'train' && p.crs) {
-        trainData[p.crs] = { departures: [], error: '', loading: true };
+        trainData[p.crs] = { departures: [], error: '', loading: true, platforms: [] };
       }
     }
     loadLineStatus();
@@ -116,10 +116,10 @@
     await Promise.all(trainPanels.map(async (panel) => {
       const crs = panel.crs!;
       try {
-        const data = await getDepartures(crs, 8, panel.platform ?? null);
-        trainData[crs] = { departures: data, error: '', loading: false };
+        const { departures, platforms } = await getDepartures(crs, 8, panel.platform ?? null);
+        trainData[crs] = { departures, platforms, error: '', loading: false };
       } catch (e: any) {
-        trainData[crs] = { departures: [], error: e.message, loading: false };
+        trainData[crs] = { departures: [], platforms: trainData[crs]?.platforms ?? [], error: e.message, loading: false };
       }
     }));
   }
@@ -131,7 +131,7 @@
     if (panel.type === 'bus' && panel.stopId) {
       stopArrivals[panel.stopId] = [];
     } else if (panel.type === 'train' && panel.crs) {
-      trainData[panel.crs] = { departures: [], error: '', loading: true };
+      trainData[panel.crs] = { departures: [], error: '', loading: true, platforms: [] };
     }
     savePanels(panels);
     showAddModal = false;
@@ -143,8 +143,8 @@
           .slice(0, 8);
       }).catch(() => {});
     } else if (panel.type === 'train' && panel.crs) {
-      getDepartures(panel.crs, 8, panel.platform ?? null).then(data => {
-        trainData[panel.crs!] = { departures: data, error: '', loading: false };
+      getDepartures(panel.crs, 8, panel.platform ?? null).then(({ departures, platforms }) => {
+        trainData[panel.crs!] = { departures, platforms, error: '', loading: false };
       }).catch(() => {});
     }
   }
@@ -171,11 +171,11 @@
     // Re-fetch for that station
     const panel = panels.find(p => p.id === panelId);
     if (panel?.crs) {
-      trainData[panel.crs] = { departures: [], error: '', loading: true };
-      getDepartures(panel.crs, 8, platform).then(data => {
-        trainData[panel.crs!] = { departures: data, error: '', loading: false };
+      trainData[panel.crs] = { departures: [], platforms: trainData[panel.crs]?.platforms ?? [], error: '', loading: true };
+      getDepartures(panel.crs, 8, platform).then(({ departures, platforms }) => {
+        trainData[panel.crs!] = { departures, platforms, error: '', loading: false };
       }).catch((e: any) => {
-        trainData[panel.crs!] = { departures: [], error: e.message, loading: false };
+        trainData[panel.crs!] = { departures: [], platforms: trainData[panel.crs!]?.platforms ?? [], error: e.message, loading: false };
       });
     }
   }
@@ -331,8 +331,9 @@
     {/if}
   </div>
 
-  <!-- Transport Section Header -->
-  <div class="transport-header grid-full">
+  <!-- Transport Section -->
+  <div class="transport-section grid-full">
+  <div class="transport-header">
     <span class="transport-title">TRANSPORT</span>
     {#if editMode}
       <button class="edit-done-btn" onclick={() => { editMode = false; }}>DONE</button>
@@ -343,7 +344,7 @@
 
   <!-- DnD Transport Panels -->
   <div
-    class="transport-zone grid-full"
+    class="transport-zone"
     use:dndzone={{ items: panels, flipDurationMs: FLIP_DURATION_MS, type: 'transport', dragDisabled: !editMode }}
     onconsider={handleDndConsider}
     onfinalize={handleDndFinalize}
@@ -399,12 +400,12 @@
                 <span class="platform-caret">&#9662;</span>
               </button>
               {#if platformDropdownOpen === panel.id}
+                {@const knownPlatforms = trainData[panel.crs!]?.platforms ?? []}
                 <div class="platform-dropdown">
                   <button class="plat-option" class:plat-active={panel.platform === null} onclick={() => changePlatform(panel.id, null)}>ALL</button>
-                  <button class="plat-option" class:plat-active={panel.platform === '1'} onclick={() => changePlatform(panel.id, '1')}>1</button>
-                  <button class="plat-option" class:plat-active={panel.platform === '2'} onclick={() => changePlatform(panel.id, '2')}>2</button>
-                  <button class="plat-option" class:plat-active={panel.platform === '3'} onclick={() => changePlatform(panel.id, '3')}>3</button>
-                  <button class="plat-option" class:plat-active={panel.platform === '4'} onclick={() => changePlatform(panel.id, '4')}>4</button>
+                  {#each knownPlatforms as plat}
+                    <button class="plat-option" class:plat-active={panel.platform === plat} onclick={() => changePlatform(panel.id, plat)}>{plat}</button>
+                  {/each}
                 </div>
               {/if}
             </span>
@@ -436,10 +437,11 @@
     {/each}
   </div>
 
-  <!-- Add Stop Card (outside DnD zone) -->
-  <button class="add-card grid-full" onclick={() => { showAddModal = true; }}>
+  <!-- Add Stop -->
+  <button class="add-card" onclick={() => { showAddModal = true; }}>
     <span class="add-card-text">+ ADD STOP</span>
   </button>
+  </div><!-- end transport-section -->
 </div>
 
 <!-- Add Stop Modal -->
@@ -892,14 +894,21 @@
   }
 
   /* ── Transport Section Header ── */
+  .transport-section {
+    background: #0f0f0f;
+    border: 1px solid #2a1a00;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px #000, 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 106, 0, 0.04);
+  }
+
   .transport-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 10px 24px;
     background: #111;
-    border: 1px solid #2a1a00;
-    border-radius: 6px;
+    border-bottom: 1px solid #1a1200;
     font-family: 'Share Tech Mono', monospace;
   }
 
@@ -945,7 +954,8 @@
   .transport-zone {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    gap: 16px;
+    padding: 16px;
   }
 
   /* ── Remove Button ── */
@@ -970,18 +980,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
-    border: 2px dashed #2a1a00;
-    border-radius: 6px;
+    width: 100%;
+    padding: 18px 24px;
+    border: none;
+    border-top: 1px solid #1a1200;
     background: transparent;
     cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    min-height: 80px;
+    transition: background 0.2s;
   }
 
   .add-card:hover {
-    border-color: #FFD600;
-    box-shadow: 0 0 15px rgba(255, 214, 0, 0.1);
+    background: #0a0a0a;
   }
 
   .add-card-text {

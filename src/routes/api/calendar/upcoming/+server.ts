@@ -2,20 +2,10 @@ import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import ical from 'node-ical';
 import type { RequestHandler } from './$types';
-
-function isAllowedOrigin(request: Request): boolean {
-  const origin = request.headers.get('origin') ?? '';
-  const referer = request.headers.get('referer') ?? '';
-  const source = origin || referer;
-  return (
-    source === '' || // same-origin SSR requests
-    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(source) ||
-    /^https:\/\/[^/]+\.netlify\.app/.test(source)
-  );
-}
+import { isAllowedOrigin, forbidden, upstreamError } from '$lib/server/security';
 
 export const GET: RequestHandler = async ({ request }) => {
-  if (!isAllowedOrigin(request)) return json({ error: 'Forbidden' }, { status: 403 });
+  if (!isAllowedOrigin(request)) return forbidden();
 
   const icsUrl = env.GOOGLE_CALENDAR_ICS_URL;
   if (!icsUrl) {
@@ -28,19 +18,11 @@ export const GET: RequestHandler = async ({ request }) => {
   let res: Response;
   try {
     res = await fetch(icsUrl, { signal: AbortSignal.timeout(8000) });
-  } catch {
-    return json({ error: 'Failed to fetch calendar' }, {
-      status: 502,
-      headers: { 'Cache-Control': 'no-store' }
-    });
+  } catch (e) {
+    return upstreamError('calendar', e);
   }
 
-  if (!res.ok) {
-    return json({ error: `Calendar fetch error: ${res.status}` }, {
-      status: res.status,
-      headers: { 'Cache-Control': 'no-store' }
-    });
-  }
+  if (!res.ok) return upstreamError('calendar', res.status);
 
   const text = await res.text();
   const parsed = ical.parseICS(text);
