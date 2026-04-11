@@ -3,9 +3,52 @@
   import { page } from '$app/state';
   import '../app.css';
   import favicon from '$lib/assets/favicon.svg';
-  import { getLondonWeather } from '$lib/api/weather';
+  import { getWeather, searchWeatherLocations, type WeatherLocation } from '$lib/api/weather';
+  import { loadSettings, saveSettings } from '$lib/stores/settings';
 
   let { children } = $props();
+
+  let settings = $state(loadSettings());
+  let editMode = $state(false);
+  let editingTitle = $state(false);
+  let editingLocation = $state(false);
+  let titleInput = $state('');
+  let locationInput = $state('');
+
+  function saveTitle() {
+    if (titleInput.trim()) {
+      settings = { ...settings, title: titleInput.trim().toUpperCase() };
+      saveSettings(settings);
+    }
+    editingTitle = false;
+  }
+
+  function saveLocation() {
+    if (locationInput.trim()) {
+      settings = { ...settings, location: locationInput.trim() };
+      saveSettings(settings);
+      loadWeather();
+    }
+    editingLocation = false;
+    locationSearchResults = [];
+  }
+
+  let locationSearchResults = $state<WeatherLocation[]>([]);
+  let locationSearchLoading = $state(false);
+  let locationSearchTimeout: ReturnType<typeof setTimeout>;
+
+  function onLocationInput() {
+    clearTimeout(locationSearchTimeout);
+    if (locationInput.length < 2) {
+      locationSearchResults = [];
+      return;
+    }
+    locationSearchLoading = true;
+    locationSearchTimeout = setTimeout(async () => {
+      locationSearchResults = await searchWeatherLocations(locationInput);
+      locationSearchLoading = false;
+    }, 300);
+  }
 
   let weather: any = $state(null);
   let weatherError = $state('');
@@ -72,6 +115,22 @@
     ],
   };
 
+  const COUNTRY_NAMES: Record<string, string> = {
+    GB: 'UK', US: 'USA', CA: 'Canada', AU: 'Australia', JP: 'Japan',
+    DE: 'Germany', FR: 'France', ES: 'Spain', IT: 'Italy', NL: 'Netherlands',
+  };
+
+  function formatLocation(loc: string): string {
+    const parts = loc.split(',');
+    if (parts.length >= 2) {
+      const city = parts[0].trim().toUpperCase();
+      const country = parts[1].trim().toUpperCase();
+      const countryName = COUNTRY_NAMES[country] || country;
+      return `${city}, ${countryName}`;
+    }
+    return loc.toUpperCase();
+  }
+
   function getWeatherCategory(w: any): string {
     const id = w.weather[0].id as number;
     const temp = w.main.temp;
@@ -97,7 +156,7 @@
 
   async function loadWeather() {
     try {
-      weather = await getLondonWeather();
+      weather = await getWeather(settings.location);
       weatherPhrase = pickPhrase(weather);
     } catch (e: any) {
       weatherError = e.message;
@@ -132,10 +191,60 @@
   <!-- Header -->
   <div class="board-header">
     <div class="header-left">
-      <span class="header-title">EICHIKO'S HOME</span>
+      {#if editingTitle}
+        <input
+          class="title-input"
+          type="text"
+          bind:value={titleInput}
+          onblur={saveTitle}
+          onkeydown={(e) => e.key === 'Enter' && saveTitle()}
+          placeholder="Enter title"
+        />
+      {:else if editMode}
+        <button class="edit-title-btn" onclick={() => { titleInput = settings.title; editingTitle = true; }}>
+          <span class="header-title">{settings.title}</span>
+        </button>
+      {:else}
+        <span class="header-title">{settings.title}</span>
+      {/if}
     </div>
     <div class="header-right">
-      <span class="header-location">GREENWICH, UK</span>
+      {#if editMode}
+        <button class="edit-done-btn" onclick={() => { editMode = false; }}>DONE</button>
+      {:else}
+        <button class="edit-toggle-btn" onclick={() => { editMode = true; }}>&#8942;</button>
+      {/if}
+      {#if editingLocation}
+        <div class="location-search">
+          <input
+            class="title-input"
+            type="text"
+            bind:value={locationInput}
+            oninput={onLocationInput}
+            onblur={saveLocation}
+            onkeydown={(e) => e.key === 'Enter' && saveLocation()}
+            placeholder="Search location..."
+          />
+          {#if locationSearchResults.length > 0}
+            <div class="location-search-results">
+              {#each locationSearchResults as loc}
+                <button class="search-result" onclick={() => { locationInput = loc.display; settings = { ...settings, location: loc.query }; saveSettings(settings); editingLocation = false; locationSearchResults = []; loadWeather(); }}>
+                  {loc.display}
+                </button>
+              {/each}
+            </div>
+          {/if}
+          {#if locationSearchLoading}
+            <span class="search-loading">Searching...</span>
+          {/if}
+        </div>
+      {:else if editMode}
+        <button class="edit-title-btn" onclick={() => { locationInput = settings.location; editingLocation = true; }}>
+          <span class="header-location">{formatLocation(settings.location)}</span>
+        </button>
+      {:else}
+        <span class="header-location">{formatLocation(settings.location)}</span>
+      {/if}
       <span class="header-time">{formatTime(now)}</span>
     </div>
   </div>
@@ -210,9 +319,96 @@
     letter-spacing: 3px;
   }
 
+  .edit-title-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .title-input {
+    background: #0f0f0f;
+    border: 1px solid #FFD600;
+    color: #FFD600;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: bold;
+    letter-spacing: 3px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    width: 200px;
+  }
+
+  .title-input::placeholder {
+    color: #666;
+    font-size: 0.9rem;
+  }
+
+  .location-search {
+    position: relative;
+  }
+
+  .location-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: #0f0f0f;
+    border: 1px solid #FFD600;
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    width: 200px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+  }
+
+  .search-result {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: #ccc;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+
+  .search-result:hover {
+    background: #1a1200;
+    color: #FFD600;
+  }
+
+  .search-loading {
+    color: #666;
+    font-size: 0.75rem;
+  }
+
+  .edit-toggle-btn, .edit-done-btn {
+    background: #1a1200;
+    border: 1px solid #FFD600;
+    color: #FFD600;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .edit-toggle-btn {
+    padding: 4px 8px;
+  }
+
+  .edit-done-btn {
+    margin-right: 8px;
+  }
+
   .header-right {
     display: flex;
-    gap: 24px;
+    gap: 16px;
     align-items: center;
   }
 

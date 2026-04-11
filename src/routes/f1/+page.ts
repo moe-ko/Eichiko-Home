@@ -1,5 +1,42 @@
 import type { PageLoad } from './$types';
 
+interface JolpicaDriver {
+  driverId: string;
+  code: string;
+  url: string;
+  givenName: string;
+  familyName: string;
+  dateOfBirth: string;
+  nationality: string;
+}
+
+interface JolpicaConstructor {
+  constructorId: string;
+  name: string;
+  nationality: string;
+}
+
+interface JolpicaDriverStanding {
+  position: string;
+  positionText: string;
+  points: string;
+  wins: string;
+  Driver: JolpicaDriver;
+  Constructors: JolpicaConstructor[];
+}
+
+interface JolpicaConstructorStanding {
+  position: string;
+  positionText: string;
+  points: string;
+  wins: string;
+  Constructor: {
+    constructorId: string;
+    name: string;
+    nationality: string;
+  };
+}
+
 interface JolpicaSession {
   date: string;
   time: string;
@@ -131,5 +168,39 @@ export const load: PageLoad = async ({ fetch }) => {
     };
   });
 
-  return { races };
+  const [standingsJson, constructorJson] = await Promise.all([
+    fetch('/api/f1/standings').then(r => r.json()),
+    fetch('/api/f1/constructor-standings').then(r => r.json()),
+  ]);
+
+  const standingsList = standingsJson.MRData.StandingsTable?.StandingsLists?.[0];
+  const drivers: JolpicaDriverStanding[] = standingsList?.DriverStandings ?? [];
+
+  const standings = drivers.map((d) => ({
+    position: parseInt(d.position),
+    positionText: d.positionText,
+    points: parseInt(d.points),
+    wins: parseInt(d.wins),
+    driverId: d.Driver.driverId,
+    code: d.Driver.code ?? d.Driver.driverId.slice(0, 3).toUpperCase(),
+    givenName: d.Driver.givenName,
+    familyName: d.Driver.familyName,
+    nationality: d.Driver.nationality,
+    constructor: d.Constructors[0]?.name ?? 'Unknown',
+  }));
+
+  const constructorList = constructorJson.MRData.StandingsTable?.StandingsLists?.[0];
+  const constructors: JolpicaConstructorStanding[] = constructorList?.ConstructorStandings ?? [];
+
+  const constructorStandings = constructors.map((c) => ({
+    position: parseInt(c.position),
+    positionText: c.positionText,
+    points: parseInt(c.points),
+    wins: parseInt(c.wins),
+    constructorId: c.Constructor.constructorId,
+    name: c.Constructor.name,
+    nationality: c.Constructor.nationality,
+  }));
+
+  return { races, standings, constructorStandings };
 };

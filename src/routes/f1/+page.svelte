@@ -1,11 +1,6 @@
 <script lang="ts">
   import type { PageData } from './$types';
 
-  const { data }: { data: PageData } = $props();
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   interface Session {
     day: string;
     date: string;
@@ -23,6 +18,41 @@
     sessions: Record<string, Session>;
     sprint: boolean;
   }
+
+  interface DriverStanding {
+    position: number;
+    positionText: string;
+    points: number;
+    wins: number;
+    driverId: string;
+    code: string;
+    givenName: string;
+    familyName: string;
+    nationality: string;
+    constructor: string;
+  }
+
+  interface ConstructorStanding {
+    position: number;
+    positionText: string;
+    points: number;
+    wins: number;
+    constructorId: string;
+    name: string;
+    nationality: string;
+  }
+
+  interface ExpandedPageData extends PageData {
+    standings: DriverStanding[];
+    constructorStandings: ConstructorStanding[];
+  }
+
+  const { data }: { data: ExpandedPageData } = $props();
+
+  let activeTab = $state<'schedule' | 'standings' | 'constructors'>('schedule');
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   function isOver(race: Race): boolean {
     const raceDate = new Date(race.date);
@@ -86,60 +116,140 @@
 </script>
 
 <div class="f1-schedule">
-  <div class="schedule-header">
-    <h2 class="schedule-title">F1 2026 SCHEDULE</h2>
-    <span class="schedule-note">ALL TIMES UTC</span>
+  <div class="tab-bar">
+    <button
+      class="tab-btn"
+      class:active={activeTab === 'schedule'}
+      onclick={() => activeTab = 'schedule'}
+    >
+      SCHEDULE
+    </button>
+    <button
+      class="tab-btn"
+      class:active={activeTab === 'standings'}
+      onclick={() => activeTab = 'standings'}
+    >
+      STANDINGS
+    </button>
+    <button
+      class="tab-btn"
+      class:active={activeTab === 'constructors'}
+      onclick={() => activeTab = 'constructors'}
+    >
+      CONSTRUCTORS
+    </button>
   </div>
 
-  <div class="race-grid">
+  {#if activeTab === 'schedule'}
+    <div class="schedule-header">
+      <h2 class="schedule-title">F1 2026 SCHEDULE</h2>
+      <span class="schedule-note">ALL TIMES UTC</span>
+    </div>
+
+    <div class="race-grid">
     {#each data.races as race, i}
-      {@const over = isOver(race)}
-      {@const next = isNext(race, i)}
-      {@const byDay = getSessionsByDay(race)}
-      <div class="race-card" class:race-over={over} class:race-next={next}>
-        <!-- Card Header -->
-        <div class="card-header">
-          <div class="card-header-left">
-            <span class="race-flag">{race.flag}</span>
-            <span class="race-country">{race.country.toUpperCase()}</span>
-            {#if race.sprint}
-              <span class="sprint-badge">SPRINT</span>
-            {/if}
-          </div>
-          <div class="card-header-right">
-            {#if over}
-              <span class="status-badge badge-over">OVER</span>
-            {:else if next}
-              <span class="status-badge badge-next">UP NEXT</span>
-            {:else}
-              <span class="status-badge badge-future">ROUND {race.round}</span>
-            {/if}
-          </div>
-        </div>
-        <div class="card-sub-header">
-          <span class="race-location">{race.location.toUpperCase()}</span>
-          <span class="race-dates">{formatDateRange(race)}</span>
-        </div>
-
-        <!-- Session Grid -->
-        <div class="session-grid">
-          {#each DAY_ORDER as day}
-            <div class="session-day">
-              <div class="day-header">{day.toUpperCase()}</div>
-              <div class="day-sessions">
-                {#each byDay[day] as session}
-                  <div class="session-item" class:session-sprint={isSprint(session.key)}>
-                    <span class="session-name">{session.label.toUpperCase()}</span>
-                    <span class="session-time">{session.time} - {session.endTime}</span>
-                  </div>
-                {/each}
-              </div>
+        {@const over = isOver(race)}
+        {@const next = isNext(race, i)}
+        {@const byDay = getSessionsByDay(race)}
+        <div class="race-card" class:race-over={over} class:race-next={next}>
+          <!-- Card Header -->
+          <div class="card-header">
+            <div class="card-header-left">
+              <span class="race-flag">{race.flag}</span>
+              <span class="race-country">{race.country.toUpperCase()}</span>
+              {#if race.sprint}
+                <span class="sprint-badge">SPRINT</span>
+              {/if}
             </div>
-          {/each}
+            <div class="card-header-right">
+              {#if over}
+                <span class="status-badge badge-over">OVER</span>
+              {:else if next}
+                <span class="status-badge badge-next">UP NEXT</span>
+              {:else}
+                <span class="status-badge badge-future">ROUND {race.round}</span>
+              {/if}
+            </div>
+          </div>
+          <div class="card-sub-header">
+            <span class="race-location">{race.location.toUpperCase()}</span>
+            <span class="race-dates">{formatDateRange(race)}</span>
+          </div>
+
+          <!-- Session Grid -->
+          <div class="session-grid">
+            {#each DAY_ORDER as day}
+              <div class="session-day">
+                <div class="day-header">{day.toUpperCase()}</div>
+                <div class="day-sessions">
+                  {#each byDay[day] as session}
+                    <div class="session-item" class:session-sprint={isSprint(session.key)}>
+                      <span class="session-name">{session.label.toUpperCase()}</span>
+                      <span class="session-time">{session.time} - {session.endTime}</span>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/each}
+          </div>
         </div>
+      {/each}
+    </div>
+  {/if}
+
+  {#if activeTab === 'standings'}
+    <div class="standings-header">
+      <h2 class="standings-title">DRIVER STANDINGS</h2>
+      <span class="standings-note">2026 CHAMPIONSHIP</span>
+    </div>
+
+    <div class="standings-table">
+      <div class="standings-row header-row">
+        <span class="col-pos">POS</span>
+        <span class="col-driver">DRIVER</span>
+        <span class="col-constructor">TEAM</span>
+        <span class="col-points">PTS</span>
+        <span class="col-wins">WINS</span>
       </div>
-    {/each}
-  </div>
+      {#each data.standings as driver}
+        {@const isLeader = driver.position <= 3}
+        <div class="standings-row" class:row-leader={isLeader}>
+          <span class="col-pos">{driver.position}</span>
+          <span class="col-driver">{driver.code} {driver.familyName.toUpperCase()}</span>
+          <span class="col-constructor">{driver.constructor}</span>
+          <span class="col-points">{driver.points}</span>
+          <span class="col-wins">{driver.wins}</span>
+        </div>
+      {/each}
+    </div>
+  {/if}
+
+  {#if activeTab === 'constructors'}
+    <div class="standings-header">
+      <h2 class="standings-title">CONSTRUCTOR STANDINGS</h2>
+      <span class="standings-note">2026 CHAMPIONSHIP</span>
+    </div>
+
+    <div class="standings-table">
+      <div class="standings-row header-row">
+        <span class="col-pos">POS</span>
+        <span class="col-driver">TEAM</span>
+        <span class="col-constructor">NATIONALITY</span>
+        <span class="col-points">PTS</span>
+        <span class="col-wins">WINS</span>
+      </div>
+      {#each data.constructorStandings as team}
+        {@const isLeader = team.position <= 3}
+        <div class="standings-row" class:row-leader={isLeader}>
+          <span class="col-pos">{team.position}</span>
+          <span class="col-driver">{team.name.toUpperCase()}</span>
+          <span class="col-constructor">{team.nationality}</span>
+          <span class="col-points">{team.points}</span>
+          <span class="col-wins">{team.wins}</span>
+        </div>
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -147,6 +257,115 @@
     padding: 20px;
     background: #050505;
     min-height: calc(100vh - 200px);
+  }
+
+  /* ── Sub Tab Bar ── */
+  .tab-bar {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #2a1a00;
+  }
+
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: #666;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: bold;
+    letter-spacing: 3px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+  }
+
+  .tab-btn:hover {
+    color: #888;
+  }
+
+  .tab-btn.active {
+    color: #FFD600;
+    border-bottom-color: #FFD600;
+  }
+
+  /* ── Standings ── */
+  .standings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 20px;
+    padding: 0 4px;
+  }
+
+  .standings-title {
+    color: #FFD600;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: bold;
+    letter-spacing: 3px;
+    margin: 0;
+  }
+
+  .standings-note {
+    color: #888;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+  }
+
+  .standings-table {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .standings-row {
+    display: grid;
+    grid-template-columns: 50px 1fr 1fr 60px 50px;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #0f0f0f;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    align-items: center;
+  }
+
+  .header-row {
+    background: #1a1200;
+    color: #FFD600;
+    font-weight: bold;
+    letter-spacing: 2px;
+    font-size: 0.75rem;
+  }
+
+  .row-leader {
+    background: #151515;
+  }
+
+  .col-pos {
+    color: #FF6A00;
+    font-weight: bold;
+  }
+
+  .col-driver {
+    color: #fff;
+  }
+
+  .col-constructor {
+    color: #888;
+  }
+
+  .col-points {
+    color: #00FF41;
+    font-weight: bold;
+    text-align: right;
+  }
+
+  .col-wins {
+    color: #666;
+    text-align: right;
   }
 
   .schedule-header {

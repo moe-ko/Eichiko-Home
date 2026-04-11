@@ -13,6 +13,26 @@ Built to minimize information overload with a focused, personal dashboard that s
 
 ---
 
+## Table of Contents
+- [Screenshots](#screenshots)
+- [Features](#features)
+  - [Weather Bar](#weather-bar)
+  - [Line Status](#line-status)
+  - [Bus Arrivals](#bus-arrivals)
+  - [Train Departures](#train-departures)
+  - [Configurable Transport Panel System](#configurable-transport-panel-system)
+  - [Appointments](#appointments)
+  - [F1 2026 Schedule](#f1-2026-schedule)
+  - [F1 Standings (Driver \& Constructor)](#f1-standings-driver--constructor)
+- [Navigation](#navigation)
+- [Tech Stack](#tech-stack)
+- [Data Sources](#data-sources)
+- [Environment Variables](#environment-variables)
+- [Development](#development)
+- [Future Improvements](#future-improvements)
+
+---
+
 ## Screenshots
 #### Home
 ![Home](./src/lib/assets/main-page.png)
@@ -41,7 +61,7 @@ User-configurable panels showing live arrivals for selected bus stops. Each row 
 ### Train Departures
 User-selected train station panels showing live departures. Each panel displays the destination, scheduled departure time, platform, and operator for upcoming trains. Supports multiple stations displayed side by side.
 
-### Configurable Transport Panel System
+#### Configurable Transport Panel System
 All bus and train panels are fully user-managed at runtime, no config files needed:
 - **Add panels** via an in-page modal, tap **+ ADD STOP** at the bottom of the transport section
 - **Remove panels** with a single tap in edit mode
@@ -67,8 +87,14 @@ Upcoming events from Google Calendar, fetched via a private ICS feed (no OAuth r
 
 ---
 
-### F1 2026 Schedule *(new)*
+### F1 2026 Schedule
 A dedicated F1 tab showing the full 2026 Formula 1 race calendar fetched live from the Jolpica F1 API. Each race card displays the circuit, date range, and a per-day session grid (Friday/Saturday/Sunday) with session names and UTC start/end times. Sprint weekends are visually distinguished. Races are automatically marked as OVER, UP NEXT, or a future round based on the current date.
+
+#### F1 Standings (Driver & Constructor)
+Within the F1 tab, three sub-tabs provide live championship standings:
+- **SCHEDULE** — Race calendar (as above)
+- **STANDINGS** — Driver championship points, wins, and team
+- **CONSTRUCTORS** — Constructor championship points and wins
 
 ---
 
