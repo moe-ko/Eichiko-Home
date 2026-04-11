@@ -17,19 +17,21 @@ Built to minimize information overload with a focused, personal dashboard that s
 - [Screenshots](#screenshots)
 - [Features](#features)
   - [Weather Bar](#weather-bar)
+    - [Editable Title & Location](#editable-title--location)
   - [Line Status](#line-status)
   - [Bus Arrivals](#bus-arrivals)
   - [Train Departures](#train-departures)
-  - [Configurable Transport Panel System](#configurable-transport-panel-system)
+    - [Configurable Transport Panel System](#configurable-transport-panel-system)
   - [Appointments](#appointments)
   - [F1 2026 Schedule](#f1-2026-schedule)
-  - [F1 Standings (Driver \& Constructor)](#f1-standings-driver--constructor)
+    - [F1 Standings (Driver & Constructor)](#f1-standings-driver--constructor)
 - [Navigation](#navigation)
+  - [Edit Mode](#edit-mode)
 - [Tech Stack](#tech-stack)
 - [Data Sources](#data-sources)
 - [Environment Variables](#environment-variables)
 - [Development](#development)
-- [Future Improvements](#future-improvements)
+- [Security](#security)
 
 ---
 
@@ -50,6 +52,12 @@ Built to minimize information overload with a focused, personal dashboard that s
 
 ### Weather Bar
 Shows current conditions for a user-selected location: temperature, probability of rain, and a rotating casual phrase that regularly updates.
+
+#### Editable Title & Location
+Long-press (or tap ⋮) to enter edit mode:
+- **Title**: Tap to edit the dashboard title (e.g., "EICHIKO'S HOME")
+- **Location**: Tap to search and change the weather location using OpenWeatherMap Geocoding API
+- Changes persist to localStorage and survive page refresh
 
 ### Line Status
 Collapsible panel (collapsed by default) showing live service status for all TFL lines and National Rail routes relevant to London. TFL lines are shown on the left; London National Rail operators on the right.
@@ -102,6 +110,11 @@ Within the F1 tab, three sub-tabs provide live championship standings:
 
 The dashboard uses a tab bar in the shared layout to switch between the **Home** transport view and the **F1** schedule. The header, weather bar, and clock persist across all tabs.
 
+#### Edit Mode
+- Tap the **⋮** button (top right) to enter edit mode
+- Edit mode allows editing the title and location
+- Tap **DONE** to exit edit mode
+
 ---
 
 ## Tech Stack
@@ -123,10 +136,11 @@ The dashboard uses a tab bar in the shared layout to switch between the **Home**
 | Source | What it provides |
 |--------|-----------------|
 | [TFL Unified API](https://api-portal.tfl.gov.uk) | Line status, bus arrivals (requires free API key for higher rate limits) |
-| [OpenWeatherMap API](https://openweathermap.org/api) | Current weather + precipitation forecast for Greenwich |
+| [OpenWeatherMap API](https://openweathermap.org/api) | Current weather + precipitation forecast |
+| [OpenWeatherMap Geocoding API](https://openweathermap.org/api/geocoding) | Location search (forward geocoding) |
 | [Huxley 2](https://huxley2.azurewebsites.net) | National Rail train departures (community-hosted JSON proxy, no API key needed) |
 | Google Calendar ICS feed | Personal calendar events via the secret iCal URL (read-only, no OAuth) |
-| [Jolpica F1 API](https://github.com/jolpica/jolpica-f1) | F1 2026 race calendar with session times (open source Ergast replacement, no key needed) |
+| [Jolpica F1 API](https://github.com/jolpica/jolpica-f1) | F1 2026 race calendar, driver & constructor standings (open source Ergast replacement, no key needed) |
 
 ---
 
@@ -164,6 +178,8 @@ npm run preview
 ```
 ---
 
-## Future Improvements
-- Add a dedicated settings page for global configuration (default location, calendar feed URL, etc.)
-- Support multiple calendar sources or filters beyond the single ICS feed.
+## Security
+- All API keys are server-side only (via SvelteKit server routes)
+- Rate limiting on weather geocoding endpoint (60 requests/minute)
+- Input validation on search queries (max 100 characters)
+- CORS headers block unauthorized requests
