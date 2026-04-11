@@ -1,5 +1,7 @@
 <script lang="ts">
-  import races from '$lib/data/f1-2026.json';
+  import type { PageData } from './$types';
+
+  const { data }: { data: PageData } = $props();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -22,8 +24,6 @@
     sprint: boolean;
   }
 
-  const typedRaces = races as Race[];
-
   function isOver(race: Race): boolean {
     const raceDate = new Date(race.date);
     raceDate.setHours(23, 59, 59);
@@ -34,7 +34,7 @@
     if (isOver(race)) return false;
     // Check if all previous races are over
     for (let i = 0; i < index; i++) {
-      if (!isOver(typedRaces[i])) return false;
+      if (!isOver(data.races[i])) return false;
     }
     return true;
   }
@@ -88,11 +88,11 @@
 <div class="f1-schedule">
   <div class="schedule-header">
     <h2 class="schedule-title">F1 2026 SCHEDULE</h2>
-    <span class="schedule-note">ALL TIMES ARE LOCAL</span>
+    <span class="schedule-note">ALL TIMES UTC</span>
   </div>
 
   <div class="race-grid">
-    {#each typedRaces as race, i}
+    {#each data.races as race, i}
       {@const over = isOver(race)}
       {@const next = isNext(race, i)}
       {@const byDay = getSessionsByDay(race)}

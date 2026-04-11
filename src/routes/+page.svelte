@@ -344,7 +344,7 @@
   <!-- DnD Transport Panels -->
   <div
     class="transport-zone grid-full"
-    use:dndzone={{ items: panels, flipDurationMs: FLIP_DURATION_MS, type: 'transport' }}
+    use:dndzone={{ items: panels, flipDurationMs: FLIP_DURATION_MS, type: 'transport', dragDisabled: !editMode }}
     onconsider={handleDndConsider}
     onfinalize={handleDndFinalize}
   >

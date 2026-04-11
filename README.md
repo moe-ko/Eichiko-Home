@@ -9,6 +9,8 @@ That's my cat's name in case you were wondering. It's a personal real-time dashb
 
 Built to minimize information overload with a focused, personal dashboard that streamlines daily routines.
 
+>Live demo: https://eichiko-home.netlify.app
+
 ---
 
 ## Screenshots
@@ -20,6 +22,9 @@ Built to minimize information overload with a focused, personal dashboard that s
 
 #### Appointments
 ![Appointments](./src/lib/assets/appointments.png)
+
+#### F1 Schedule
+![F1 Schedule](./src/lib/assets/f1.png)
 
 ## Features
 
@@ -36,8 +41,40 @@ User-configurable panels showing live arrivals for selected bus stops. Each row 
 ### Train Departures
 User-selected train station panels showing live departures. Each panel displays the destination, scheduled departure time, platform, and operator for upcoming trains. Supports multiple stations displayed side by side.
 
+### Configurable Transport Panel System
+All bus and train panels are fully user-managed at runtime, no config files needed:
+- **Add panels** via an in-page modal, tap **+ ADD STOP** at the bottom of the transport section
+- **Remove panels** with a single tap in edit mode
+- **Drag to reorder** panels freely using flexible grip handles (powered by `svelte-dnd-action`), only active in edit mode so normal touch scrolling is unaffected
+- **Edit mode** toggled via a ⋮ button; shows remove controls and drag handles without cluttering the default view
+- Panel layout adapts to a 2-column grid on tablet and stacks to a single column on mobile
+
+#### Adding a Bus Stop
+1. Tap **+ ADD STOP** → select the **BUS** tab
+2. Type at least 2 characters to search TFL stops by name (live search via TFL API)
+3. Select a stop from the results, if the stop has multiple directions (e.g. both sides of the road), a direction picker appears showing each stop letter and its towards destination
+4. Pick the correct direction to add the panel
+
+#### Adding a Train Station
+1. Tap **+ ADD STOP** → select the **TRAIN** tab
+2. Type a station name or its 3-letter CRS code (e.g. `LBG` for London Bridge)
+3. Select the station from the results
+4. Choose a specific platform to filter departures, or select **ALL** to show all platforms
+---
+
 ### Appointments
 Upcoming events from Google Calendar, fetched via a private ICS feed (no OAuth required). Shows up to 10 events with the day/time, event title, and an expandable row revealing location and description. Events are independently expandable by tapping. Refreshes every 30 seconds.
+
+---
+
+### F1 2026 Schedule *(new)*
+A dedicated F1 tab showing the full 2026 Formula 1 race calendar fetched live from the Jolpica F1 API. Each race card displays the circuit, date range, and a per-day session grid (Friday/Saturday/Sunday) with session names and UTC start/end times. Sprint weekends are visually distinguished. Races are automatically marked as OVER, UP NEXT, or a future round based on the current date.
+
+---
+
+## Navigation
+
+The dashboard uses a tab bar in the shared layout to switch between the **Home** transport view and the **F1** schedule. The header, weather bar, and clock persist across all tabs.
 
 ---
 
@@ -63,6 +100,7 @@ Upcoming events from Google Calendar, fetched via a private ICS feed (no OAuth r
 | [OpenWeatherMap API](https://openweathermap.org/api) | Current weather + precipitation forecast for Greenwich |
 | [Huxley 2](https://huxley2.azurewebsites.net) | National Rail train departures (community-hosted JSON proxy, no API key needed) |
 | Google Calendar ICS feed | Personal calendar events via the secret iCal URL (read-only, no OAuth) |
+| [Jolpica F1 API](https://github.com/jolpica/jolpica-f1) | F1 2026 race calendar with session times (open source Ergast replacement, no key needed) |
 
 ---
 
@@ -76,7 +114,7 @@ OPENWEATHER_API_KEY=       # from https://openweathermap.org/api (required)
 GOOGLE_CALENDAR_ICS_URL=   # from Google Calendar → Settings → Integrate calendar → "Secret address in iCal format"
 ```
 
-All variables are server-side only — never exposed to the browser.
+All variables are server-side only, never exposed to the browser.
 
 ---
 
@@ -98,8 +136,8 @@ npm run build
 # Preview production build
 npm run preview
 ```
+---
 
 ## Future Improvements
-- Add a settings page for configuring bus stops, train stations, and calendar feed.
-- Add a UI component to dynamically create and manage grid layouts for configurable bus stops and train station panels.
-- Implement drag-and-drop or add/remove buttons for users to customize their dashboard with new departure panels.
+- Add a dedicated settings page for global configuration (default location, calendar feed URL, etc.)
+- Support multiple calendar sources or filters beyond the single ICS feed.
