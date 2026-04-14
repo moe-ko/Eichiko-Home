@@ -18,6 +18,7 @@
   let appointments: CalendarEvent[] = $state([]);
   let appointmentsError = $state('');
   let expandedEvents: Record<string, boolean> = $state({});
+  let lastUpdated = $state<Date | null>(null);
 
   function toggleEvent(key: string) {
     expandedEvents[key] = !expandedEvents[key];
@@ -93,6 +94,7 @@
 
   async function fetchAllData() {
     await Promise.all([fetchBusArrivals(), fetchTrainDepartures(), loadLineStatus(), fetchAppointments()]);
+    lastUpdated = new Date();
   }
 
   async function fetchBusArrivals() {
@@ -215,6 +217,13 @@
     const mon = d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase();
     return `${day} ${mon} ${hh}:${mm}`;
   }
+
+  function formatLastUpdated(date: Date): string {
+    const hh = date.getHours().toString().padStart(2, '0');
+    const mm = date.getMinutes().toString().padStart(2, '0');
+    const ss = date.getSeconds().toString().padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+  }
 </script>
 
 <!-- Grid layout for tablet -->
@@ -335,6 +344,9 @@
   <div class="transport-section grid-full">
   <div class="transport-header">
     <span class="transport-title">TRANSPORT</span>
+    {#if lastUpdated}
+      <span class="last-updated">UPDATED {formatLastUpdated(lastUpdated)}</span>
+    {/if}
     {#if editMode}
       <button class="edit-done-btn" onclick={() => { editMode = false; }}>DONE</button>
     {:else}
@@ -379,7 +391,7 @@
               {@const mins = formatMins(arrival.timeToStation)}
               <div class="led-row" class:row-alt={i % 2 === 1}>
                 <span class="col-route led-bold led-yellow">{arrival.lineName}</span>
-                <span class="col-dest led-yellow">{(([arrival.towards, arrival.destinationName].find(v => v && v !== 'null')) || '—').toUpperCase()}</span>
+                <span class="col-dest led-yellow">{(([arrival.destinationName, arrival.towards].find(v => v && v !== 'null')) || '—').toUpperCase()}</span>
                 <span class="col-mins" class:due-blink={mins === 'DUE'} class:due-text={mins === 'DUE'}>{mins}</span>
               </div>
             {/each}
@@ -466,7 +478,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 20px;
     padding: 20px;
-    background: #050505;
+    background: var(--bg-card-alt);
   }
 
   .grid-full {
@@ -476,22 +488,22 @@
   /* ── Sections (Card Style) ── */
   .board-section {
     margin: 0;
-    background: #0f0f0f;
-    border: 1px solid #2a1a00;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     overflow: hidden;
-    box-shadow: 0 0 0 1px #000, 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 106, 0, 0.04);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   }
 
   .section-header {
-    background: #111;
+    background: var(--bg-secondary);
     padding: 10px 24px;
-    color: #FFD600;
+    color: var(--text-secondary);
     font-size: 0.85rem;
     font-weight: bold;
     letter-spacing: 3px;
     font-family: 'Share Tech Mono', monospace;
-    border-bottom: 1px solid #1a1200;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -508,7 +520,7 @@
   }
 
   .badge-bus {
-    background: #FF6A00;
+    background: var(--accent);
     color: #000;
   }
 
@@ -518,9 +530,9 @@
   }
 
   .badge-stop-letter {
-    background: #1a1200;
-    color: #FFD600;
-    border: 1px solid #3a2a00;
+    background: var(--bg-card-alt);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
     flex-shrink: 0;
   }
 
@@ -540,27 +552,27 @@
   }
 
   .tap-hint {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.65rem;
     letter-spacing: 1.5px;
     font-weight: normal;
   }
 
   .toggle-icon {
-    color: #FFD600;
+    color: var(--text-secondary);
     font-size: 0.75rem;
   }
 
   .section-toggle:hover {
-    background: #1a1a1a;
+    background: var(--bg-card-alt);
   }
 
   /* ── Column Headers ── */
   .col-header-row {
     display: flex;
     padding: 8px 24px;
-    background: #1a1200;
-    color: #FF6A00;
+    background: var(--bg-card-alt);
+    color: var(--text-primary);
     font-size: 0.7rem;
     font-weight: bold;
     letter-spacing: 2px;
@@ -568,8 +580,8 @@
   }
 
   .col-header-yellow {
-    background: #1a1500;
-    color: #FFD600;
+    background: var(--bg-card-alt);
+    color: var(--text-secondary);
   }
 
   .col-header-tfl {
@@ -584,20 +596,20 @@
 
   /* ── Data Rows (LED effect) ── */
   .led-row {
-    background: #0f0f0f;
-    border-bottom: 1px solid #1a1200;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
     padding: 10px 24px;
     font-family: 'LED Dot-Matrix', monospace;
     text-transform: uppercase;
     letter-spacing: 2px;
     display: flex;
     font-size: 1rem;
-    color: #FF6A00;
-    text-shadow: 0 0 8px rgba(255, 106, 0, 0.4);
+    color: var(--text-primary);
+    text-shadow: 0 0 8px var(--accent-glow);
   }
 
   .led-row.row-alt {
-    background: #0a0a0a;
+    background: var(--bg-card-alt);
   }
 
   .board-section .led-row:last-child {
@@ -610,8 +622,8 @@
 
   /* ── Yellow LED text for route/destination ── */
   .led-yellow {
-    color: #FFD600 !important;
-    text-shadow: 0 0 8px rgba(255, 214, 0, 0.4) !important;
+    color: var(--led-yellow) !important;
+    text-shadow: 0 0 8px var(--led-yellow-glow) !important;
   }
 
   /* ── Line Status Columns (with dot leaders) ── */
@@ -621,7 +633,7 @@
 
   .line-dots {
     flex: 1;
-    border-bottom: 1px dotted #3a1a00;
+    border-bottom: 1px dotted var(--border-color);
     margin: 0 8px;
     align-self: center;
     height: 0;
@@ -665,8 +677,8 @@
   }
 
   .due-text {
-    color: #FF3333 !important;
-    text-shadow: 0 0 8px rgba(255, 51, 51, 0.4) !important;
+    color: var(--led-red) !important;
+    text-shadow: 0 0 8px var(--led-red-glow) !important;
   }
 
   /* ── Train Columns ── */
@@ -698,25 +710,27 @@
 
   /* ── Status Colors (LED green / red) ── */
   .status-good {
-    color: #00FF41 !important;
-    text-shadow: 0 0 8px rgba(0, 255, 65, 0.4) !important;
+    color: var(--led-green) !important;
+    text-shadow: 0 0 8px var(--led-green-glow) !important;
   }
 
   .status-delay {
-    color: #FF3333 !important;
-    text-shadow: 0 0 8px rgba(255, 51, 51, 0.4) !important;
+    color: var(--led-red) !important;
+    text-shadow: 0 0 8px var(--led-red-glow) !important;
   }
 
   .error-text {
-    color: #FF3333;
+    color: var(--led-red);
     font-size: 0.8rem;
-    text-shadow: 0 0 8px rgba(255, 51, 51, 0.4);
+    text-shadow: 0 0 8px var(--led-red-glow);
   }
 
   .loading-text {
-    color: #7a3500;
+    color: var(--text-muted);
     font-size: 0.8rem;
     text-shadow: none;
+    font-family: 'LED Dot-Matrix', monospace;
+    letter-spacing: 2px;
   }
 
   /* ── Low-contrast line name boost ── */
@@ -732,7 +746,7 @@
   }
 
   .line-status-col {
-    border-right: 1px solid #2a1a00;
+    border-right: 1px solid var(--border-color);
   }
 
   .line-status-col:last-child {
@@ -777,7 +791,7 @@
     }
     .line-status-col {
       border-right: none;
-      border-bottom: 1px solid #2a1a00;
+      border-bottom: 1px solid var(--border-color);
     }
     .line-status-col:last-child {
       border-bottom: none;
@@ -796,7 +810,7 @@
   .event-row {
     width: 100%;
     border: none;
-    border-bottom: 1px solid #1a1200;
+    border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     text-align: left;
     font: inherit;
@@ -807,20 +821,20 @@
   }
 
   .event-row:hover {
-    background: #1a1200;
+    background: var(--bg-card-alt);
   }
 
   .event-row.row-alt:hover {
-    background: #14100a;
+    background: var(--bg-card-alt);
   }
 
   .event-chevron {
     flex-shrink: 0;
     width: 24px;
     text-align: right;
-    color: #FFD600;
+    color: var(--text-secondary);
     font-size: 0.75rem;
-    text-shadow: 0 0 6px rgba(255, 214, 0, 0.4);
+    text-shadow: 0 0 6px var(--led-yellow-glow);
   }
 
   .col-event {
@@ -844,14 +858,14 @@
   }
 
   .led-sub-row {
-    background: #0f0f0f;
-    border-bottom: 1px solid #1a1200;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
     padding: 8px 24px 14px 24px;
     font-family: 'LED Dot-Matrix', monospace;
     letter-spacing: 2px;
     font-size: 0.9rem;
-    color: #FF6A00;
-    text-shadow: 0 0 8px rgba(255, 106, 0, 0.4);
+    color: var(--text-primary);
+    text-shadow: 0 0 8px var(--accent-glow);
     text-transform: none;
     display: flex;
     flex-direction: column;
@@ -861,7 +875,7 @@
   }
 
   .led-sub-row.row-alt {
-    background: #0a0a0a;
+    background: var(--bg-card-alt);
   }
 
   .sub-line {
@@ -876,8 +890,8 @@
   .sub-label {
     flex-shrink: 0;
     width: 140px;
-    color: #FFD600;
-    text-shadow: 0 0 6px rgba(255, 214, 0, 0.4);
+    color: var(--text-secondary);
+    text-shadow: 0 0 6px var(--led-yellow-glow);
     text-transform: uppercase;
   }
 
@@ -895,11 +909,11 @@
 
   /* ── Transport Section Header ── */
   .transport-section {
-    background: #0f0f0f;
-    border: 1px solid #2a1a00;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     overflow: hidden;
-    box-shadow: 0 0 0 1px #000, 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 106, 0, 0.04);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   }
 
   .transport-header {
@@ -907,22 +921,30 @@
     justify-content: space-between;
     align-items: center;
     padding: 10px 24px;
-    background: #111;
-    border-bottom: 1px solid #1a1200;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
     font-family: 'Share Tech Mono', monospace;
   }
 
   .transport-title {
-    color: #FFD600;
+    color: var(--text-secondary);
     font-size: 0.85rem;
     font-weight: bold;
     letter-spacing: 3px;
   }
 
+  .last-updated {
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    margin-left: auto;
+    margin-right: 16px;
+  }
+
   .edit-toggle-btn {
     background: none;
     border: none;
-    color: #888;
+    color: var(--text-muted);
     font-size: 1.4rem;
     cursor: pointer;
     padding: 4px 10px;
@@ -931,13 +953,13 @@
   }
 
   .edit-toggle-btn:hover {
-    color: #FFD600;
+    color: var(--text-secondary);
   }
 
   .edit-done-btn {
     background: none;
-    border: 1px solid #FFD600;
-    color: #FFD600;
+    border: 1px solid var(--text-secondary);
+    color: var(--text-secondary);
     font-family: 'Share Tech Mono', monospace;
     font-size: 0.7rem;
     letter-spacing: 2px;
@@ -947,7 +969,7 @@
   }
 
   .edit-done-btn:hover {
-    background: #1a1200;
+    background: var(--bg-card-alt);
   }
 
   /* ── Transport DnD Zone ── */
@@ -962,17 +984,18 @@
   .remove-btn {
     background: none;
     border: none;
-    color: #FF3333;
+    color: var(--led-red);
     font-size: 1rem;
     cursor: pointer;
     padding: 0 8px 0 0;
     line-height: 1;
-    text-shadow: 0 0 8px rgba(255, 51, 51, 0.4);
+    text-shadow: 0 0 8px var(--led-red-glow);
     font-family: 'Share Tech Mono', monospace;
   }
 
   .remove-btn:hover {
-    color: #FF6666;
+    color: var(--led-red);
+    opacity: 0.7;
   }
 
   /* ── Add Card ── */
@@ -983,14 +1006,14 @@
     width: 100%;
     padding: 18px 24px;
     border: none;
-    border-top: 1px solid #1a1200;
+    border-top: 1px solid var(--border-color);
     background: transparent;
     cursor: pointer;
     transition: background 0.2s;
   }
 
   .add-card:hover {
-    background: #0a0a0a;
+    background: var(--bg-card-alt);
   }
 
   .add-card-text {

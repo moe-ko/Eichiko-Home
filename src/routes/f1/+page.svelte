@@ -255,7 +255,7 @@
 <style>
   .f1-schedule {
     padding: 20px;
-    background: #050505;
+    background: var(--bg-card-alt);
     min-height: calc(100vh - 200px);
   }
 
@@ -264,13 +264,13 @@
     display: flex;
     gap: 2px;
     margin-bottom: 20px;
-    border-bottom: 1px solid #2a1a00;
+    border-bottom: 1px solid var(--border-color);
   }
 
   .tab-btn {
     background: transparent;
     border: none;
-    color: #666;
+    color: var(--text-muted);
     font-family: 'Share Tech Mono', monospace;
     font-size: 0.8rem;
     font-weight: bold;
@@ -282,12 +282,12 @@
   }
 
   .tab-btn:hover {
-    color: #888;
+    color: var(--text-muted);
   }
 
   .tab-btn.active {
-    color: #FFD600;
-    border-bottom-color: #FFD600;
+    color: var(--text-secondary);
+    border-bottom-color: var(--text-secondary);
   }
 
   /* ── Standings ── */
@@ -300,7 +300,7 @@
   }
 
   .standings-title {
-    color: #FFD600;
+    color: var(--text-secondary);
     font-family: 'Share Tech Mono', monospace;
     font-size: 1.1rem;
     font-weight: bold;
@@ -309,7 +309,7 @@
   }
 
   .standings-note {
-    color: #888;
+    color: var(--text-muted);
     font-family: 'Share Tech Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 2px;
@@ -326,45 +326,47 @@
     grid-template-columns: 50px 1fr 1fr 60px 50px;
     gap: 10px;
     padding: 10px 16px;
-    background: #0f0f0f;
-    font-family: 'Share Tech Mono', monospace;
+    background: var(--bg-card);
+    font-family: 'LED Dot-Matrix', monospace;
     font-size: 0.85rem;
     align-items: center;
+    color: var(--text-primary);
+    text-shadow: 0 0 8px var(--led-yellow-glow);
   }
 
   .header-row {
-    background: #1a1200;
-    color: #FFD600;
+    background: var(--bg-card-alt);
+    color: var(--text-secondary);
     font-weight: bold;
     letter-spacing: 2px;
     font-size: 0.75rem;
   }
 
   .row-leader {
-    background: #151515;
+    background: var(--bg-card-alt);
   }
 
   .col-pos {
-    color: #FF6A00;
+    color: var(--text-primary);
     font-weight: bold;
   }
 
   .col-driver {
-    color: #fff;
+    color: var(--text-body);
   }
 
   .col-constructor {
-    color: #888;
+    color: var(--text-muted);
   }
 
   .col-points {
-    color: #00FF41;
+    color: var(--led-green);
     font-weight: bold;
     text-align: right;
   }
 
   .col-wins {
-    color: #666;
+    color: var(--text-muted);
     text-align: right;
   }
 
@@ -377,7 +379,7 @@
   }
 
   .schedule-title {
-    color: #FFD600;
+    color: var(--text-secondary);
     font-family: 'Share Tech Mono', monospace;
     font-size: 1.1rem;
     font-weight: bold;
@@ -386,7 +388,7 @@
   }
 
   .schedule-note {
-    color: #888;
+    color: var(--text-muted);
     font-family: 'Share Tech Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 2px;
@@ -401,11 +403,11 @@
 
   /* ── Race Card ── */
   .race-card {
-    background: #0f0f0f;
-    border: 1px solid #2a1a00;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     overflow: hidden;
-    box-shadow: 0 0 0 1px #000, 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 106, 0, 0.04);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   }
 
   .race-over {
@@ -413,8 +415,8 @@
   }
 
   .race-next {
-    border-color: #00FF41;
-    box-shadow: 0 0 0 1px #000, 0 0 20px rgba(0, 255, 65, 0.15), 0 0 40px rgba(0, 255, 65, 0.08);
+    border-color: var(--led-green);
+    box-shadow: 0 0 20px var(--led-green-glow);
   }
 
   /* ── Card Header ── */
@@ -476,7 +478,7 @@
   }
 
   .race-dates {
-    color: #FF6A00;
+    color: var(--text-primary);
     font-family: 'Share Tech Mono', monospace;
     font-size: 0.75rem;
     letter-spacing: 1px;
@@ -507,7 +509,7 @@
 
   .badge-future {
     background: #1a1200;
-    color: #FF6A00;
+    color: var(--text-primary);
     border: 1px solid #2a1a00;
   }
 
@@ -545,14 +547,17 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
+    font-family: 'LED Dot-Matrix', monospace;
+    color: var(--text-primary);
+    text-shadow: 0 0 8px var(--led-yellow-glow);
   }
 
   .session-name {
-    color: #FF6A00;
+    color: var(--text-primary);
     font-family: 'LED Dot-Matrix', monospace;
     font-size: 0.7rem;
     letter-spacing: 1px;
-    text-shadow: 0 0 6px rgba(255, 106, 0, 0.3);
+    text-shadow: 0 0 6px var(--accent-glow);
   }
 
   .session-time {

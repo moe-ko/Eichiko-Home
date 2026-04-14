@@ -23,6 +23,11 @@
     editingTitle = false;
   }
 
+  function toggleTheme() {
+    settings = { ...settings, theme: settings.theme === 'dark' ? 'light' : 'dark' };
+    saveSettings(settings);
+  }
+
   function saveLocation() {
     if (locationInput.trim()) {
       settings = { ...settings, location: locationInput.trim() };
@@ -187,7 +192,7 @@
   <link rel="icon" href={favicon} />
 </svelte:head>
 
-<div class="led-board">
+<div class="led-board" data-theme={settings.theme}>
   <!-- Header -->
   <div class="board-header">
     <div class="header-left">
@@ -212,6 +217,7 @@
       {#if editMode}
         <button class="edit-done-btn" onclick={() => { editMode = false; }}>DONE</button>
       {:else}
+        <button class="theme-toggle-btn" onclick={toggleTheme} title="Toggle theme">{settings.theme === 'dark' ? '☀' : '☽'}</button>
         <button class="edit-toggle-btn" onclick={() => { editMode = true; }}>&#8942;</button>
       {/if}
       {#if editingLocation}
@@ -288,8 +294,8 @@
   /* ── Board Shell ── */
   .led-board {
     min-height: 100vh;
-    background: #0a0a0a;
-    color: #FF6A00;
+    background: var(--bg-primary);
+    color: var(--text-primary);
     font-family: 'LED Dot-Matrix', monospace;
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -302,8 +308,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 24px;
-    background: #111;
-    border-bottom: 3px solid #FFD600;
+    background: var(--bg-secondary);
+    border-bottom: 3px solid var(--text-secondary);
     font-family: 'Share Tech Mono', monospace;
   }
 
@@ -313,7 +319,7 @@
   }
 
   .header-title {
-    color: #FFD600;
+    color: var(--text-secondary);
     font-size: 1.5rem;
     font-weight: bold;
     letter-spacing: 3px;
@@ -327,9 +333,9 @@
   }
 
   .title-input {
-    background: #0f0f0f;
-    border: 1px solid #FFD600;
-    color: #FFD600;
+    background: var(--bg-primary);
+    border: 1px solid var(--text-secondary);
+    color: var(--text-secondary);
     font-family: 'Share Tech Mono', monospace;
     font-size: 1.5rem;
     font-weight: bold;
@@ -340,7 +346,7 @@
   }
 
   .title-input::placeholder {
-    color: #666;
+    color: var(--text-muted);
     font-size: 0.9rem;
   }
 
@@ -352,14 +358,14 @@
     position: absolute;
     top: 100%;
     left: 0;
-    background: #0f0f0f;
-    border: 1px solid #FFD600;
+    background: var(--bg-card);
+    border: 1px solid var(--text-secondary);
     border-radius: 4px;
     max-height: 200px;
     overflow-y: auto;
     z-index: 1000;
     width: 200px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   }
 
   .search-result {
@@ -368,7 +374,7 @@
     text-align: left;
     background: none;
     border: none;
-    color: #ccc;
+    color: var(--text-body);
     font-family: 'Share Tech Mono', monospace;
     font-size: 0.85rem;
     padding: 8px 12px;
@@ -376,19 +382,19 @@
   }
 
   .search-result:hover {
-    background: #1a1200;
-    color: #FFD600;
+    background: var(--bg-card-alt);
+    color: var(--text-secondary);
   }
 
   .search-loading {
-    color: #666;
+    color: var(--text-muted);
     font-size: 0.75rem;
   }
 
-  .edit-toggle-btn, .edit-done-btn {
-    background: #1a1200;
-    border: 1px solid #FFD600;
-    color: #FFD600;
+  .theme-toggle-btn, .edit-toggle-btn, .edit-done-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--text-secondary);
+    color: var(--text-secondary);
     font-family: 'Share Tech Mono', monospace;
     font-size: 0.75rem;
     font-weight: bold;
@@ -396,6 +402,11 @@
     padding: 4px 10px;
     border-radius: 4px;
     cursor: pointer;
+  }
+
+  .theme-toggle-btn {
+    font-size: 1rem;
+    padding: 2px 8px;
   }
 
   .edit-toggle-btn {
@@ -413,12 +424,12 @@
   }
 
   .header-location {
-    color: #FFD600;
+    color: var(--text-secondary);
     font-size: 0.9rem;
   }
 
   .header-time {
-    color: #FFD600;
+    color: var(--text-secondary);
     font-size: 1.2rem;
     font-weight: bold;
   }
@@ -429,51 +440,51 @@
     align-items: center;
     gap: 14px;
     padding: 14px 24px;
-    background: #111;
-    border-bottom: 2px solid #222;
+    background: var(--bg-secondary);
+    border-bottom: 2px solid var(--border-color);
     flex-wrap: wrap;
     font-family: 'Share Tech Mono', monospace;
   }
 
   .weather-icon {
     font-size: 1.6rem;
-    color: #FFD600;
+    color: var(--text-secondary);
   }
 
   .weather-temp {
-    color: #FFFFFF;
+    color: var(--text-body);
     font-size: 1.3rem;
     font-weight: bold;
   }
 
   .weather-desc {
-    color: #E0E0E0;
+    color: var(--text-body);
     font-size: 0.9rem;
   }
 
   .weather-sep {
-    color: #444;
+    color: var(--text-muted);
     font-size: 0.9rem;
   }
 
   .weather-pop {
-    color: #E0E0E0;
+    color: var(--text-body);
     font-size: 0.9rem;
   }
 
   .weather-phrase {
-    color: #E0E0E0;
+    color: var(--text-body);
     font-size: 0.9rem;
     text-transform: none;
   }
 
   .weather-error {
-    color: #FF3333;
+    color: var(--led-red);
     font-size: 0.85rem;
   }
 
   .weather-loading {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.85rem;
   }
 
@@ -481,14 +492,14 @@
   .tab-bar {
     display: flex;
     gap: 0;
-    background: #0a0a0a;
-    border-bottom: 1px solid #222;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
     font-family: 'Share Tech Mono', monospace;
     padding: 0 24px;
   }
 
   .tab-link {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.85rem;
     font-weight: bold;
     letter-spacing: 3px;
@@ -499,12 +510,12 @@
   }
 
   .tab-link:hover {
-    color: #FF6A00;
+    color: var(--text-primary);
   }
 
   .tab-link.active {
-    color: #FFD600;
-    border-bottom-color: #FFD600;
+    color: var(--text-secondary);
+    border-bottom-color: var(--text-secondary);
   }
 
   /* ── Responsive ── */

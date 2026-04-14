@@ -303,15 +303,15 @@
   }
 
   .modal-content {
-    background: #0f0f0f;
-    border: 1px solid #2a1a00;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     width: 100%;
     max-width: 520px;
     max-height: 80vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 0 40px rgba(255, 106, 0, 0.1), 0 0 0 1px #000;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.3);
     overflow: hidden;
   }
 
@@ -320,13 +320,13 @@
     justify-content: space-between;
     align-items: center;
     padding: 14px 20px;
-    background: #111;
-    border-bottom: 1px solid #1a1200;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
     font-family: 'Share Tech Mono', monospace;
   }
 
   .modal-title {
-    color: #FFD600;
+    color: var(--text-secondary);
     font-size: 0.95rem;
     font-weight: bold;
     letter-spacing: 3px;
@@ -335,23 +335,24 @@
   .modal-close {
     background: none;
     border: none;
-    color: #FF3333;
+    color: var(--led-red);
     font-size: 1.2rem;
     cursor: pointer;
     padding: 4px 8px;
     font-family: 'Share Tech Mono', monospace;
-    text-shadow: 0 0 8px rgba(255, 51, 51, 0.4);
+    text-shadow: 0 0 8px var(--led-red-glow);
   }
 
   .modal-close:hover {
-    color: #FF6666;
+    color: var(--led-red);
+    opacity: 0.7;
   }
 
   .modal-tabs {
     display: flex;
     gap: 0;
-    background: #111;
-    border-bottom: 1px solid #1a1200;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
     padding: 0 20px;
   }
 
@@ -366,7 +367,7 @@
   }
 
   .tab-active-bus {
-    border-bottom-color: #FF6A00;
+    border-bottom-color: var(--accent);
   }
 
   .tab-active-train {
@@ -391,7 +392,7 @@
   }
 
   .badge-bus {
-    background: #FF6A00;
+    background: var(--accent);
     color: #000;
   }
 
@@ -402,17 +403,17 @@
 
   .search-wrapper {
     padding: 14px 20px;
-    background: #0a0a0a;
-    border-bottom: 1px solid #1a1200;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
   }
 
   .search-input {
     width: 100%;
-    background: #050505;
-    border: 1px solid #2a1a00;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 10px 14px;
-    color: #FF6A00;
+    color: var(--text-primary);
     font-family: 'LED Dot-Matrix', monospace;
     font-size: 0.9rem;
     letter-spacing: 2px;
@@ -422,13 +423,13 @@
   }
 
   .search-input::placeholder {
-    color: #5a3000;
+    color: var(--text-muted);
     letter-spacing: 1.5px;
   }
 
   .search-input:focus {
-    border-color: #FF6A00;
-    box-shadow: 0 0 10px rgba(255, 106, 0, 0.15);
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
   }
 
   .results-list {
@@ -443,29 +444,29 @@
     align-items: center;
     width: 100%;
     padding: 12px 20px;
-    background: #0f0f0f;
+    background: var(--bg-card);
     border: none;
-    border-bottom: 1px solid #1a1200;
+    border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     text-align: left;
     font-family: 'LED Dot-Matrix', monospace;
     font-size: 0.85rem;
     letter-spacing: 2px;
-    color: #FFD600;
-    text-shadow: 0 0 8px rgba(255, 214, 0, 0.3);
+    color: var(--led-yellow);
+    text-shadow: 0 0 8px var(--led-yellow-glow);
     text-transform: uppercase;
   }
 
   .result-row:hover {
-    background: #1a1200;
+    background: var(--bg-card-alt);
   }
 
   .result-alt {
-    background: #0a0a0a;
+    background: var(--bg-card-alt);
   }
 
   .result-alt:hover {
-    background: #14100a;
+    background: var(--bg-card-alt);
   }
 
   .result-name {
@@ -479,15 +480,15 @@
   .result-id,
   .result-crs {
     flex-shrink: 0;
-    color: #FF6A00;
+    color: var(--text-primary);
     font-size: 0.75rem;
     margin-left: 12px;
-    text-shadow: 0 0 6px rgba(255, 106, 0, 0.3);
+    text-shadow: 0 0 6px var(--accent-glow);
   }
 
   .result-msg {
     padding: 20px;
-    color: #7a3500;
+    color: var(--text-muted);
     font-family: 'LED Dot-Matrix', monospace;
     font-size: 0.8rem;
     letter-spacing: 2px;
@@ -496,8 +497,8 @@
   }
 
   .result-error {
-    color: #FF3333;
-    text-shadow: 0 0 8px rgba(255, 51, 51, 0.4);
+    color: var(--led-red);
+    text-shadow: 0 0 8px var(--led-red-glow);
   }
 
   .platform-picker {
@@ -507,12 +508,12 @@
   }
 
   .platform-label {
-    color: #FFD600;
+    color: var(--text-secondary);
     font-family: 'Share Tech Mono', monospace;
     font-size: 0.8rem;
     letter-spacing: 2px;
     margin-bottom: 20px;
-    text-shadow: 0 0 8px rgba(255, 214, 0, 0.3);
+    text-shadow: 0 0 8px var(--led-yellow-glow);
   }
 
   .platform-buttons {
@@ -524,9 +525,9 @@
   }
 
   .plat-btn {
-    background: #1a1200;
-    border: 1px solid #2a1a00;
-    color: #FFD600;
+    background: var(--bg-card-alt);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
     font-family: 'LED Dot-Matrix', monospace;
     font-size: 1rem;
     letter-spacing: 2px;
@@ -534,20 +535,20 @@
     min-width: 60px;
     cursor: pointer;
     border-radius: 4px;
-    text-shadow: 0 0 8px rgba(255, 214, 0, 0.3);
+    text-shadow: 0 0 8px var(--led-yellow-glow);
     transition: background 0.15s, border-color 0.15s;
   }
 
   .plat-btn:hover {
-    background: #2a1a00;
-    border-color: #FF6A00;
-    box-shadow: 0 0 10px rgba(255, 106, 0, 0.15);
+    background: var(--bg-card-alt);
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
   }
 
   .back-btn {
     background: none;
     border: none;
-    color: #888;
+    color: var(--text-muted);
     font-family: 'Share Tech Mono', monospace;
     font-size: 0.75rem;
     letter-spacing: 2px;
@@ -557,16 +558,16 @@
   }
 
   .back-btn:hover {
-    color: #FFD600;
+    color: var(--text-secondary);
   }
 
   .child-letter {
-    color: #FF6A00;
+    color: var(--text-primary);
     font-weight: bold;
     margin-right: 10px;
   }
 
   .child-towards {
-    color: #FFD600;
+    color: var(--text-secondary);
   }
 </style>

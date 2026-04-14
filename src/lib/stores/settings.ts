@@ -3,17 +3,24 @@ const STORAGE_KEY = 'eichiko-settings';
 export interface UserSettings {
   title: string;
   location: string;
+  theme: 'dark' | 'light';
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
   title: "EICHIKO'S HOME",
   location: 'Greenwich,GB',
+  theme: 'dark',
 };
 
 function isValidSettings(s: unknown): s is UserSettings {
   if (!s || typeof s !== 'object') return false;
   const o = s as Record<string, unknown>;
-  return typeof o.title === 'string' && typeof o.location === 'string';
+  const title = o.title as string | undefined;
+  const location = o.location as string | undefined;
+  const theme = o.theme as string | undefined;
+  if (typeof title !== 'string' || typeof location !== 'string') return false;
+  if (theme !== 'dark' && theme !== 'light' && theme !== undefined) return false;
+  return true;
 }
 
 export function loadSettings(): UserSettings {
@@ -25,6 +32,10 @@ export function loadSettings(): UserSettings {
     // Migration: merge old weatherLocation into location (unified settings)
     if (parsed.weatherLocation && !parsed.location) {
       parsed.location = parsed.weatherLocation;
+    }
+    // Migration: add theme if missing (defaults to 'dark')
+    if (parsed.theme !== 'dark' && parsed.theme !== 'light') {
+      parsed.theme = 'dark';
     }
     if (isValidSettings(parsed)) {
       return parsed;
