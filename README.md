@@ -1,4 +1,10 @@
 [![Netlify Status](https://api.netlify.com/api/v1/badges/64cfd5aa-8502-4753-9f4a-e89a063383b3/deploy-status)](https://app.netlify.com/projects/eichiko-home/deploys)
+![Deploy Status](https://img.shields.io/endpoint?url=https://deploy-badge.mikejimmy-mj.workers.dev)
+
+
+https://eichiko-home.mikejimmy-mj.workers.dev/
+
+
 ![Release](https://img.shields.io/github/v/release/moe-ko/Eichiko-Home)
 ![License](https://img.shields.io/github/license/moe-ko/Eichiko-Home)
 ---
