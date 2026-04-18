@@ -1,9 +1,3 @@
-[![Netlify Status](https://api.netlify.com/api/v1/badges/64cfd5aa-8502-4753-9f4a-e89a063383b3/deploy-status)](https://app.netlify.com/projects/eichiko-home/deploys)
-![Deploy Status](https://img.shields.io/endpoint?url=https://deploy-badge.mikejimmy-mj.workers.dev)
-
-
-https://eichiko-home.mikejimmy-mj.workers.dev/
-
 
 ![Release](https://img.shields.io/github/v/release/moe-ko/Eichiko-Home)
 ![License](https://img.shields.io/github/license/moe-ko/Eichiko-Home)
@@ -15,7 +9,7 @@ That's my cat's name in case you were wondering. It's a personal real-time dashb
 
 Built to minimize information overload with a focused, personal dashboard that streamlines daily routines.
 
->Live demo: https://eichiko-home.netlify.app
+>Live demo: https://eichiko-home.mikejimmy-mj.workers.dev
 
 ---
 
@@ -132,7 +126,7 @@ The dashboard uses a tab bar in the shared layout to switch between the **Home**
 | Styling | [Tailwind CSS v4](https://tailwindcss.com) via `@tailwindcss/vite` |
 | Fonts | LED Dot-Matrix (CDN), Share Tech Mono |
 | Server routes | SvelteKit `+server.ts` (proxy routes keep API keys off the client) |
-| Deployment | [Netlify](https://netlify.com) via `@sveltejs/adapter-netlify` |
+| Deployment | [Cloudflare Workers](https://workers.cloudflare.com) via `@sveltejs/adapter-cloudflare` |
 | Calendar parsing | [`node-ical`](https://www.npmjs.com/package/node-ical) |
 
 ---
@@ -152,12 +146,13 @@ The dashboard uses a tab bar in the shared layout to switch between the **Home**
 
 ## Environment Variables
 
-Set in `.env` locally, or in the Netlify dashboard for production:
+Set in `.env` locally, or in the Cloudflare Workers dashboard (Settings → Variables and Secrets) for production:
 
 ```
 TFL_APP_KEY=               # from https://api-portal.tfl.gov.uk (optional, higher rate limits)
 OPENWEATHER_API_KEY=       # from https://openweathermap.org/api (required)
 GOOGLE_CALENDAR_ICS_URL=   # from Google Calendar → Settings → Integrate calendar → "Secret address in iCal format"
+ALLOWED_HOST=              # optional: custom domain (e.g. eichiko.yourdomain.com). *.workers.dev allowed automatically.
 ```
 
 All variables are server-side only, never exposed to the browser.
