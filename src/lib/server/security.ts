@@ -1,6 +1,5 @@
 import { json } from '@sveltejs/kit';
-
-const PROD_HOST = 'eichiko-home.netlify.app';
+import { env } from '$env/dynamic/private';
 
 export function isAllowedOrigin(request: Request): boolean {
   const origin = request.headers.get('origin') ?? '';
@@ -10,7 +9,10 @@ export function isAllowedOrigin(request: Request): boolean {
   try {
     const u = new URL(source);
     if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return true;
-    if (u.protocol === 'https:' && u.hostname === PROD_HOST) return true;
+    if (u.protocol === 'https:') {
+      if (env.ALLOWED_HOST && u.hostname === env.ALLOWED_HOST) return true;
+      if (u.hostname.endsWith('.workers.dev') || u.hostname.endsWith('.pages.dev')) return true;
+    }
   } catch {
     /* fall through */
   }
