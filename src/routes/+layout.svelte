@@ -5,6 +5,7 @@
   import favicon from '$lib/assets/favicon.svg';
   import { getWeather, searchWeatherLocations, type WeatherLocation } from '$lib/api/weather';
   import { loadSettings, saveSettings } from '$lib/stores/settings';
+  import CatAnimation from '$lib/components/CatAnimation.svelte';
 
   let { children } = $props();
 
@@ -213,6 +214,9 @@
         <span class="header-title">{settings.title}</span>
       {/if}
     </div>
+    <div class="header-center">
+      <CatAnimation />
+    </div>
     <div class="header-right">
       {#if editMode}
         <button class="edit-done-btn" onclick={() => { editMode = false; }}>DONE</button>
@@ -316,6 +320,15 @@
   .header-left {
     display: flex;
     align-items: center;
+  }
+
+  .header-center {
+    flex: 1;
+    margin: 0 16px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    align-self: stretch;
   }
 
   .header-title {

@@ -110,6 +110,9 @@ Within the F1 tab, three sub-tabs provide live championship standings:
 
 The dashboard uses a tab bar in the shared layout to switch between the **Home** transport view and the **F1** schedule. The header, weather bar, and clock persist across all tabs.
 
+#### Animated Pixel Cat
+A canvas-rendered pixel art cat lives in the header between the title and the clock. It walks left and right across the space, occasionally stops to sit, blinks, and wags its tail. Drawn in the amber LED theme colour with no external assets — pure canvas pixel art at 4 px per art-pixel.
+
 #### Edit Mode
 - Tap the **⋮** button (top right) to enter edit mode
 - Edit mode allows editing the title and location
