@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { flip } from 'svelte/animate';
   import { dndzone } from 'svelte-dnd-action';
-  import { getAllLineStatusByMode, getStopArrivals } from '$lib/api/tfl';
+  import { getAllLineStatusByMode, getStopArrivals, getStationDisruptions } from '$lib/api/tfl';
   import { getDepartures, type TrainService } from '$lib/api/rail';
   import { getUpcomingEvents, type CalendarEvent } from '$lib/api/calendar';
   import { TUBE_LINES } from '$lib/constants/lines';
@@ -19,9 +19,52 @@
   let appointmentsError = $state('');
   let expandedEvents: Record<string, boolean> = $state({});
   let lastUpdated = $state<Date | null>(null);
+  let disruptions: any[] = $state([]);
+  let disruptionsError = $state('');
+  let alertPanelOverride: boolean | null = $state(null);
+  const alertPanelCollapsed = $derived(alertPanelOverride ?? (disruptions.length === 0 && !disruptionsError));
+  let alertSearchQuery = $state('');
+  let alertSearchResults: any[] = $state([]);
+  let alertSearchLoading = $state(false);
+  let alertSearchSubmitted = $state('');
+  let alertSuggestions: any[] = $state([]);
+  let showAlertSuggestions = $state(false);
+  let alertSuggestionIndex = $state(-1);
+  let alertSearchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let expandedAlerts: Record<string, boolean> = $state({});
+
+  // Client-side cache of the merged stop-disruption feed, shared by refresh, suggestions and search
+  const DISRUPTION_FEED_TTL_MS = 5 * 60 * 1000;
+  let disruptionFeed: { data: any[]; fetchedAt: number } | null = null;
+  let disruptionFeedPending: Promise<any[]> | null = null;
+
+  async function loadDisruptionFeed(): Promise<any[]> {
+    if (disruptionFeed && Date.now() - disruptionFeed.fetchedAt < DISRUPTION_FEED_TTL_MS) {
+      return disruptionFeed.data;
+    }
+    if (disruptionFeedPending) return disruptionFeedPending;
+    disruptionFeedPending = (async () => {
+      try {
+        const data = await getStationDisruptions();
+        disruptionFeed = { data, fetchedAt: Date.now() };
+        return data;
+      } finally {
+        disruptionFeedPending = null;
+      }
+    })();
+    return disruptionFeedPending;
+  }
 
   function toggleEvent(key: string) {
     expandedEvents[key] = !expandedEvents[key];
+  }
+
+  function toggleAlert(key: string) {
+    expandedAlerts[key] = !expandedAlerts[key];
+  }
+
+  function toggleAlertPanel() {
+    alertPanelOverride = !alertPanelCollapsed;
   }
 
   let panels: TransportPanel[] = $state([]);
@@ -69,6 +112,7 @@
 
   onDestroy(() => {
     clearInterval(interval);
+    if (alertSearchDebounceTimer) clearTimeout(alertSearchDebounceTimer);
   });
 
   async function loadLineStatus() {
@@ -93,7 +137,7 @@
   }
 
   async function fetchAllData() {
-    await Promise.all([fetchBusArrivals(), fetchTrainDepartures(), loadLineStatus(), fetchAppointments()]);
+    await Promise.all([fetchBusArrivals(), fetchTrainDepartures(), loadLineStatus(), fetchAppointments(), fetchDisruptions()]);
     lastUpdated = new Date();
   }
 
@@ -193,6 +237,215 @@
     }
   }
 
+  async function fetchDisruptions() {
+    try {
+      const busPanels = panels.filter(p => p.type === 'bus' && p.stopId);
+      const trainPanels = panels.filter(p => p.type === 'train' && p.crs);
+      
+      const busStopIds = busPanels.map(p => p.stopId!.toUpperCase());
+      const trainLabels = trainPanels.map(p => normalizeStationName(p.label));
+      
+      const allDisruptions = await loadDisruptionFeed();
+
+      const now = new Date();
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      
+      // Filter to relevant disruptions for user's stations
+      const relevant = allDisruptions.filter((d: any) => {
+        const mode = (d.mode || '').toLowerCase();
+        // Bus items are always appearance Information, so filter bus by type instead
+        if (mode === 'bus') {
+          if (d.type !== 'Closure' && d.type !== 'Part Closure') return false;
+        } else if (!['PlannedWork', 'RealTime'].includes(d.appearance)) {
+          return false;
+        }
+        // Within next 7 days
+        const fromDate = new Date(d.fromDate).getTime();
+        if (fromDate > now.getTime() + sevenDays) return false;
+        if (new Date(d.toDate).getTime() < now.getTime()) return false;
+        
+        const atco = (d.atcoCode || '').toUpperCase();
+        const stationAtco = (d.stationAtcoCode || '').toUpperCase();
+        const commonName = normalizeStationName(d.commonName || '');
+        
+        // Match bus stops: exact NaPTAN stop ID only
+        if (mode === 'bus') {
+          return busStopIds.some(id => atco === id || stationAtco === id);
+        }
+        
+        // Match train stations: exact normalised station name
+        if (mode === 'national-rail' || mode === 'tube' || mode === 'overground' || mode === 'dlr' || mode === 'elizabeth-line') {
+          return commonName !== '' && trainLabels.includes(commonName);
+        }
+        
+        return false;
+      });
+      
+      const typeRank = (type: string) =>
+        type === 'Closure' ? 0 : type === 'Part Closure' ? 1 : type === 'Interchange Message' ? 2 : 3;
+      const fromTime = (d: any) => new Date(d.fromDate).getTime();
+
+      // Group by station so tube and rail items for the same named station collapse into one
+      const groups = new Map<string, any[]>();
+      for (const d of relevant) {
+        const key = (d.mode || '').toLowerCase() === 'bus'
+          ? `bus:${(d.atcoCode || '').toUpperCase()}`
+          : `train:${normalizeStationName(d.commonName || '')}`;
+        const group = groups.get(key);
+        if (group) group.push(d);
+        else groups.set(key, [d]);
+      }
+
+      // One alert per station: latest started, else soonest upcoming. TfL DisruptedPoint
+      // has no announcement timestamp, so fromDate is used.
+      const chosen = [...groups.values()].map(group => {
+        const started = group.filter(d => fromTime(d) <= now.getTime());
+        if (started.length > 0) {
+          return started.sort((a, b) => fromTime(b) - fromTime(a) || typeRank(a.type) - typeRank(b.type))[0];
+        }
+        return group.sort((a, b) => fromTime(a) - fromTime(b) || typeRank(a.type) - typeRank(b.type))[0];
+      });
+
+      // Latest first, most severe as tie-break
+      chosen.sort((a: any, b: any) => fromTime(b) - fromTime(a) || typeRank(a.type) - typeRank(b.type));
+
+      const next = chosen.slice(0, 10);
+      if ((next.length === 0) !== (disruptions.length === 0)) alertPanelOverride = null;
+      disruptions = next;
+      disruptionsError = '';
+    } catch (e: any) {
+      disruptionsError = e.message;
+      disruptions = [];
+    }
+  }
+
+  // Normalize station names for exact matching (remove prefixes/suffixes)
+  function normalizeStationName(name: string): string {
+    return name
+      .toUpperCase()
+      .replace(/^LONDON\s+/, '')
+      .replace(/\s+(UNDERGROUND|RAIL|DLR)\s+STATION$/, '')
+      .replace(/\s+STATION$/, '')
+      .replace(/\s+UNDERGROUND$/, '')
+      .trim();
+  }
+
+  async function searchStationDisruptions(query: string) {
+    if (!query.trim()) {
+      alertSearchResults = [];
+      alertSearchSubmitted = '';
+      return;
+    }
+    alertSearchSubmitted = query.trim();
+    alertSearchLoading = true;
+    try {
+      const allDisruptions = await loadDisruptionFeed();
+      const q = query.trim().toUpperCase();
+      // Search by station name, atcoCode, stationAtcoCode, or CRS code
+      alertSearchResults = allDisruptions.filter((d: any) => {
+        const name = (d.commonName || '').toUpperCase();
+        const atco = (d.atcoCode || '').toUpperCase();
+        const stationAtco = (d.stationAtcoCode || '').toUpperCase();
+        return name.includes(q) || atco.includes(q) || stationAtco.includes(q);
+      }).slice(0, 10);
+      alertSearchLoading = false;
+    } catch (e: any) {
+      alertSearchLoading = false;
+      alertSearchResults = [];
+    }
+  }
+
+  function clearAlertSearch() {
+    alertSearchQuery = '';
+    alertSearchResults = [];
+    alertSearchSubmitted = '';
+    alertSuggestions = [];
+    showAlertSuggestions = false;
+    alertSuggestionIndex = -1;
+  }
+
+  function handleAlertSearchInput() {
+    if (alertSearchDebounceTimer) clearTimeout(alertSearchDebounceTimer);
+    
+    const query = alertSearchQuery.trim();
+    if (query.length < 2) {
+      alertSuggestions = [];
+      showAlertSuggestions = false;
+      alertSuggestionIndex = -1;
+      return;
+    }
+    
+    alertSearchDebounceTimer = setTimeout(async () => {
+      try {
+        const allDisruptions = await loadDisruptionFeed();
+        // A newer keystroke superseded this one
+        if (alertSearchQuery.trim() !== query) return;
+        const q = query.toUpperCase();
+        const seen = new Set<string>();
+        alertSuggestions = allDisruptions
+          .filter((d: any) => {
+            const name = (d.commonName || '').toUpperCase();
+            const atco = (d.atcoCode || '').toUpperCase();
+            const stationAtco = (d.stationAtcoCode || '').toUpperCase();
+            const key = d.commonName + '|' + (d.atcoCode || d.stationAtcoCode);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return name.includes(q) || atco.includes(q) || stationAtco.includes(q);
+          })
+          .slice(0, 8);
+        showAlertSuggestions = alertSuggestions.length > 0;
+        alertSuggestionIndex = -1;
+      } catch (e) {
+        alertSuggestions = [];
+        showAlertSuggestions = false;
+      }
+    }, 300);
+  }
+
+  function handleAlertSearchKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (showAlertSuggestions && alertSuggestionIndex >= 0) {
+        selectAlertSuggestion(alertSuggestions[alertSuggestionIndex]);
+      } else {
+        searchStationDisruptions(alertSearchQuery);
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (showAlertSuggestions && alertSuggestions.length > 0) {
+        alertSuggestionIndex = (alertSuggestionIndex + 1) % alertSuggestions.length;
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (showAlertSuggestions && alertSuggestions.length > 0) {
+        alertSuggestionIndex = alertSuggestionIndex <= 0 ? alertSuggestions.length - 1 : alertSuggestionIndex - 1;
+      }
+    } else if (e.key === 'Escape') {
+      showAlertSuggestions = false;
+      alertSuggestionIndex = -1;
+    }
+  }
+
+  function handleAlertSearchFocus() {
+    if (alertSearchQuery.trim().length >= 2 && alertSuggestions.length > 0) {
+      showAlertSuggestions = true;
+    }
+  }
+
+  function handleAlertSearchBlur() {
+    setTimeout(() => {
+      showAlertSuggestions = false;
+      alertSuggestionIndex = -1;
+    }, 200);
+  }
+
+  function selectAlertSuggestion(s: any) {
+    alertSearchQuery = s.commonName;
+    showAlertSuggestions = false;
+    alertSuggestionIndex = -1;
+    searchStationDisruptions(alertSearchQuery);
+  }
+
   function formatMins(seconds: number): string {
     const m = Math.floor(seconds / 60);
     return m <= 0 ? 'DUE' : `${m}`;
@@ -218,6 +471,15 @@
     return `${day} ${mon} ${hh}:${mm}`;
   }
 
+  function formatDate(iso: string): string {
+    const d = new Date(iso);
+    const day = d.getDate().toString().padStart(2, '0');
+    const mon = d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase();
+    const hh = d.getHours().toString().padStart(2, '0');
+    const mm = d.getMinutes().toString().padStart(2, '0');
+    return `${day} ${mon} ${hh}:${mm}`;
+  }
+
   function formatLastUpdated(date: Date): string {
     const hh = date.getHours().toString().padStart(2, '0');
     const mm = date.getMinutes().toString().padStart(2, '0');
@@ -228,6 +490,100 @@
 
 <!-- Grid layout for tablet -->
 <div class="board-grid">
+  <!-- Station Alerts (collapsible, hazard tape frame while alerts are active) -->
+  <div class="board-section grid-full" class:alert-panel={disruptions.length > 0}>
+    <button type="button" class="section-header section-toggle" aria-expanded={!alertPanelCollapsed} onclick={toggleAlertPanel}>
+      <span class="section-title-group">
+        <span>STATION ALERTS</span>
+        <span class="tap-hint">{disruptions.length > 0 ? `${disruptions.length} ACTIVE` : disruptionsError ? 'ALERTS UNAVAILABLE' : 'NO ACTIVE ALERTS'} · TAP TO {alertPanelCollapsed ? 'EXPAND' : 'COLLAPSE'}</span>
+      </span>
+      <span class="toggle-icon">{alertPanelCollapsed ? '▶' : '▼'}</span>
+    </button>
+    {#if !alertPanelCollapsed}
+      <div class="alert-content">
+        <!-- Search Input with Suggestions -->
+        <div class="alert-search">
+          <div class="alert-search-field">
+            <input
+              type="text"
+              class="alert-search-input"
+              placeholder="SEARCH STATION... (NAME OR CODE e.g. NEH)"
+              bind:value={alertSearchQuery}
+              oninput={handleAlertSearchInput}
+              onkeydown={handleAlertSearchKeydown}
+              onfocus={handleAlertSearchFocus}
+              onblur={handleAlertSearchBlur}
+            />
+            <span class="alert-search-icon">SEARCH</span>
+          </div>
+
+          <!-- Suggestions Dropdown -->
+          {#if showAlertSuggestions && alertSuggestions.length > 0}
+            <div class="alert-suggestions-dropdown">
+              {#each alertSuggestions as s, i}
+                <button
+                  class="alert-suggestion-row"
+                  class:alert-suggestion-active={i === alertSuggestionIndex}
+                  class:result-alt={i % 2 === 1}
+                  onclick={() => selectAlertSuggestion(s)}
+                >
+                  <span class="suggestion-name">{s.commonName.toUpperCase()}</span>
+                  <span class="suggestion-code">{s.atcoCode || s.stationAtcoCode}</span>
+                  <span class="suggestion-mode">{s.mode.toUpperCase()}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
+        {#if alertSearchSubmitted && !showAlertSuggestions}
+          <div class="alert-search-results-header">
+            <span class="alert-search-label">SEARCH RESULTS FOR: {alertSearchSubmitted.toUpperCase()}</span>
+            <button class="alert-search-clear" onclick={clearAlertSearch}>CLEAR</button>
+          </div>
+        {/if}
+
+        <div class="alert-list">
+          {#each (alertSearchSubmitted ? alertSearchResults : disruptions) as d, i}
+            {@const alertKey = `${d.atcoCode}|${d.fromDate}|${d.description}`}
+            {@const isExpanded = expandedAlerts[alertKey] === true}
+            <div class="alert-item" class:alert-planned={d.appearance === 'PlannedWork'} class:alert-realtime={d.appearance === 'RealTime'} class:alert-information={d.appearance === 'Information'}>
+              <button type="button" class="alert-meta alert-toggle" aria-expanded={isExpanded} onclick={() => toggleAlert(alertKey)}>
+                <span class="alert-station">{d.commonName?.toUpperCase()}</span>
+                <span class="alert-type">{d.type?.toUpperCase()}</span>
+                <span class="alert-mode">{d.mode?.toUpperCase()}</span>
+                <span class="alert-chevron">{isExpanded ? '▼' : '▶'}</span>
+              </button>
+              {#if isExpanded}
+                <div class="alert-detail">
+                  <div class="alert-desc">{d.description}</div>
+                  <div class="alert-dates">
+                    <span class="alert-from">FROM: {formatDate(d.fromDate)}</span>
+                    <span class="alert-to">TO: {formatDate(d.toDate)}</span>
+                    <span class="alert-code">{d.atcoCode || d.stationAtcoCode}</span>
+                  </div>
+                </div>
+              {/if}
+            </div>
+          {/each}
+          {#if alertSearchSubmitted && !alertSearchLoading && alertSearchResults.length === 0}
+            <div class="alert-empty">
+              <span class="alert-empty-icon">SEARCH</span>
+              <span>NO DISRUPTIONS FOUND FOR "{alertSearchSubmitted.toUpperCase()}"</span>
+            </div>
+          {:else if !alertSearchSubmitted && disruptionsError}
+            <div class="led-row"><span class="error-text">ALERTS UNAVAILABLE: {disruptionsError}</span></div>
+          {:else if !alertSearchSubmitted && disruptions.length === 0}
+            <div class="alert-empty">
+              <span class="alert-empty-icon">OK</span>
+              <span>NO ACTIVE ALERTS FOR YOUR STATIONS</span>
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
+  </div>
+
   <!-- Line Status (collapsible) -->
   <div class="board-section grid-full">
     <button class="section-header section-toggle" onclick={() => lineStatusCollapsed = !lineStatusCollapsed}>
@@ -1120,6 +1476,390 @@
   @media (max-width: 900px) {
     .transport-zone {
       grid-template-columns: 1fr;
+    }
+  }
+
+  /* ── Alert Panel: hazard tape frame while alerts are active ── */
+  .alert-panel {
+    padding: 6px;
+    border: 0;
+    background: repeating-linear-gradient(
+      -45deg,
+      #000 0,
+      #000 6px,
+      #FFD600 6px,
+      #FFD600 12px
+    );
+  }
+
+  .alert-content {
+    padding: 16px 24px;
+    background: #0a0a0a;
+  }
+
+  .alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .alert-item {
+    background: #0d0d0d;
+    border: 1px solid #1a1200;
+    border-radius: 4px;
+    padding: 10px 18px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .alert-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #FFD600;
+  }
+
+  .alert-planned::before {
+    background: linear-gradient(180deg, #FFD600, #FF6A00);
+    box-shadow: 0 0 8px #FFD600;
+  }
+
+  .alert-realtime::before {
+    background: linear-gradient(180deg, #FF4444, #FF0000);
+    box-shadow: 0 0 8px #FF4444;
+  }
+
+  .alert-item:hover {
+    border-color: #3a2a00;
+    box-shadow: 0 0 16px rgba(255, 214, 0, 0.1);
+  }
+
+  .alert-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 0;
+    flex-wrap: wrap;
+  }
+
+  .alert-toggle {
+    width: 100%;
+    background: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .alert-chevron {
+    margin-left: auto;
+    color: #FFD600;
+    font-size: 0.7rem;
+  }
+
+  .alert-detail {
+    margin-top: 10px;
+  }
+
+  .alert-station {
+    font-family: 'LED Dot-Matrix', monospace;
+    font-size: 0.95rem;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #FFD600;
+    text-shadow: 0 0 8px rgba(255, 214, 0, 0.5);
+  }
+
+  .alert-type {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1.5px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    background: #1a1200;
+    color: #FF6A00;
+    border: 1px solid #2a1a00;
+  }
+
+  .alert-planned .alert-type {
+    background: #2a1a00;
+    color: #FFD600;
+    border-color: #3a2a00;
+  }
+
+  .alert-realtime .alert-type {
+    background: #2a0000;
+    color: #FF4444;
+    border-color: #4a0000;
+  }
+
+  .alert-desc {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: #ccc;
+    letter-spacing: 0.5px;
+    text-transform: none;
+    margin-bottom: 8px;
+  }
+
+  .alert-dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    color: #888;
+  }
+
+  .alert-from,
+  .alert-to {
+    background: #111;
+    padding: 2px 8px;
+    border: 1px solid #1a1200;
+    border-radius: 2px;
+  }
+
+  /* Search styles */
+  .alert-search {
+    position: relative;
+    margin-bottom: 16px;
+  }
+
+  .alert-search-field {
+    position: relative;
+  }
+
+  .alert-search-input {
+    width: 100%;
+    background: #0d0d0d;
+    border: 2px solid #1a1200;
+    border-radius: 4px;
+    padding: 12px 48px 12px 16px;
+    font-family: 'LED Dot-Matrix', monospace;
+    font-size: 0.85rem;
+    letter-spacing: 2px;
+    color: #FFD600;
+    text-transform: uppercase;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .alert-search-input::placeholder {
+    color: #4a3a00;
+    letter-spacing: 1px;
+  }
+
+  .alert-search-input:focus {
+    border-color: #FFD600;
+    box-shadow: 0 0 16px rgba(255, 214, 0, 0.3);
+  }
+
+  .alert-search-icon {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #4a3a00;
+    font-size: 1rem;
+    pointer-events: none;
+  }
+
+  .alert-search-input:focus + .alert-search-icon {
+    color: #FFD600;
+  }
+
+  .alert-search-results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #2a1a00;
+  }
+
+  .alert-search-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: #FF6A00;
+  }
+
+  .alert-search-clear {
+    background: none;
+    border: 1px solid #2a1a00;
+    color: #FF6A00;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1.5px;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  .alert-search-clear:hover {
+    background: #1a1200;
+    border-color: #FF6A00;
+    color: #FFD600;
+  }
+
+  /* Suggestions dropdown */
+  .alert-suggestions-dropdown {
+    position: relative;
+    margin-top: 4px;
+    background: #0d0d0d;
+    border: 1px solid #2a1a00;
+    border-radius: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(255, 214, 0, 0.1);
+    z-index: 100;
+    overflow: hidden;
+    animation: suggestion-dropdown-in 0.15s ease-out;
+  }
+
+  @keyframes suggestion-dropdown-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .alert-suggestion-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #1a1200;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+  }
+
+  .alert-suggestion-row:last-child {
+    border-bottom: none;
+  }
+
+  .alert-suggestion-row:hover,
+  .alert-suggestion-row.alert-suggestion-active {
+    background: #1a1200;
+  }
+
+  .suggestion-name {
+    flex: 1;
+    font-family: 'LED Dot-Matrix', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 1.5px;
+    color: #FFD600;
+    text-shadow: 0 0 6px rgba(255, 214, 0, 0.4);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .suggestion-code {
+    font-family: 'LED Dot-Matrix', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    color: #FF6A00;
+    background: #111;
+    padding: 2px 8px;
+    border: 1px solid #2a1a00;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .suggestion-mode {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    background: #111;
+    color: #888;
+    border: 1px solid #1a1200;
+    white-space: nowrap;
+  }
+
+  .alert-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 24px;
+    text-align: center;
+    color: #00AAFF;
+  }
+
+  .alert-empty-icon {
+    font-size: 2rem;
+  }
+
+  .alert-empty span {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+  }
+
+  .alert-mode {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 1px;
+    padding: 1px 6px;
+    border-radius: 2px;
+    background: #111;
+    color: #888;
+    border: 1px solid #1a1200;
+  }
+
+  .alert-code {
+    font-family: 'LED Dot-Matrix', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    color: #666;
+    background: #111;
+    padding: 1px 6px;
+    border: 1px solid #1a1200;
+    border-radius: 2px;
+  }
+
+  .alert-information {
+    border-left-color: #00AAFF;
+  }
+
+  .alert-information::before {
+    background: linear-gradient(180deg, #00AAFF, #0088CC);
+    box-shadow: 0 0 8px #00AAFF;
+  }
+
+  .alert-information .alert-type {
+    background: #001a2a;
+    color: #00AAFF;
+    border-color: #002a4a;
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 640px) {
+    .alert-content {
+      padding: 12px 16px;
+    }
+    .alert-station {
+      font-size: 0.8rem;
+    }
+    .alert-desc {
+      font-size: 0.7rem;
+    }
+    .alert-dates {
+      gap: 8px;
+      font-size: 0.55rem;
     }
   }
 </style>
