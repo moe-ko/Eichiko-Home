@@ -1,8 +1,9 @@
 export interface TransportPanel {
   id: string;
-  type: 'bus' | 'train';
+  type: 'bus' | 'train' | 'tfl';
   label: string;
-  stopId?: string;      // NaPTAN ID (bus)
+  stopId?: string;      // NaPTAN ID (bus), station NaPTAN ID (tfl)
   crs?: string;         // CRS code (train)
-  platform?: string | null; // null = ALL
+  mode?: string;        // TfL mode (tfl)
+  platform?: string | null; // null = ALL (train, tfl)
 }

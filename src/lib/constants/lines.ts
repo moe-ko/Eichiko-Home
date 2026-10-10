@@ -22,4 +22,6 @@ export const TUBE_LINES = [
   // Other TFL
   { id: 'overground', name: 'Overground', color: '#EE7C0E' },
   { id: 'dlr', name: 'DLR', color: '#00A4A7' },
+  { id: 'tram', name: 'Tram', color: '#84B817' },
+  { id: 'london-cable-car', name: 'London Cable Car', color: '#E21836' },
 ];

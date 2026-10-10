@@ -11,7 +11,7 @@ export async function getStopArrivals(stopId: string): Promise<any[]> {
 }
 
 export async function getStationDisruptions(): Promise<any[]> {
-  const modes = 'tube,overground,elizabeth-line,dlr,bus,national-rail';
+  const modes = 'bus,replacement-bus,coach,tube,dlr,overground,elizabeth-line,tram,river-bus,river-tour,cable-car,national-rail';
   const res = await fetch(`/api/tfl/stop-disruption/${modes}`);
   if (!res.ok) throw new Error(`TFL API error: ${res.status}`);
   return res.json();

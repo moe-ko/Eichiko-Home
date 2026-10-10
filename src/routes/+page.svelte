@@ -7,6 +7,7 @@
   import { getUpcomingEvents, type CalendarEvent } from '$lib/api/calendar';
   import { TUBE_LINES } from '$lib/constants/lines';
   import { loadPanels, savePanels } from '$lib/stores/transport';
+  import { normalizeStationName } from '$lib/utils/stations';
   import type { TransportPanel } from '$lib/types/transport';
   import AddStopModal from '$lib/components/AddStopModal.svelte';
 
@@ -73,6 +74,9 @@
 
   let stopArrivals: Record<string, any[]> = $state({});
   let stopErrors: Record<string, string> = $state({});
+  // Distinct platforms per TfL station, set by each successful fetch (unset = not loaded yet)
+  // stopId -> mode -> platform names (one station can serve several modes)
+  let tflPlatforms: Record<string, Record<string, string[]>> = $state({});
 
   let trainData: Record<string, { departures: TrainService[]; error: string; loading: boolean; platforms: string[] }> = $state({});
 
@@ -89,6 +93,8 @@
         stopArrivals[p.stopId] = [];
       } else if (p.type === 'train' && p.crs) {
         trainData[p.crs] = { departures: [], error: '', loading: true, platforms: [] };
+      } else if (p.type === 'tfl' && p.stopId) {
+        stopArrivals[p.stopId] = [];
       }
     }
     loadLineStatus();
@@ -137,7 +143,7 @@
   }
 
   async function fetchAllData() {
-    await Promise.all([fetchBusArrivals(), fetchTrainDepartures(), loadLineStatus(), fetchAppointments(), fetchDisruptions()]);
+    await Promise.all([fetchBusArrivals(), fetchTrainDepartures(), fetchTflArrivals(), loadLineStatus(), fetchAppointments(), fetchDisruptions()]);
     lastUpdated = new Date();
   }
 
@@ -170,6 +176,36 @@
     }));
   }
 
+  async function fetchTflArrivals() {
+    const tflPanels = panels.filter(p => p.type === 'tfl' && p.stopId);
+    // Several panels can share a station (one per platform), fetch each station once
+    const stopIds = [...new Set(tflPanels.map(p => p.stopId!))];
+    await Promise.all(stopIds.map(async (stopId) => {
+      try {
+        setTflArrivals(stopId, await getStopArrivals(stopId));
+        stopErrors[stopId] = '';
+      } catch (e: any) {
+        stopErrors[stopId] = e.message;
+      }
+    }));
+  }
+
+  // Keep every arrival (platform filtering happens per panel in the markup)
+  function setTflArrivals(stopId: string, data: any[]) {
+    stopArrivals[stopId] = data.sort((a: any, b: any) => a.timeToStation - b.timeToStation);
+    const byMode: Record<string, Set<string>> = {};
+    for (const a of data) {
+      const n = a.platformName;
+      if (typeof a.modeName !== 'string' || typeof n !== 'string' || n.trim() === '' || n === 'null') continue;
+      (byMode[a.modeName] ??= new Set<string>()).add(n);
+    }
+    const platforms: Record<string, string[]> = {};
+    for (const [mode, names] of Object.entries(byMode)) {
+      platforms[mode] = [...names].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    }
+    tflPlatforms[stopId] = platforms;
+  }
+
   function addPanel(newPanel: Omit<TransportPanel, 'id'>) {
     const panel: TransportPanel = { ...newPanel, id: crypto.randomUUID() };
     panels = [...panels, panel];
@@ -178,6 +214,9 @@
       stopArrivals[panel.stopId] = [];
     } else if (panel.type === 'train' && panel.crs) {
       trainData[panel.crs] = { departures: [], error: '', loading: true, platforms: [] };
+    } else if (panel.type === 'tfl' && panel.stopId) {
+      stopArrivals[panel.stopId] = [];
+      delete tflPlatforms[panel.stopId];
     }
     savePanels(panels);
     showAddModal = false;
@@ -191,6 +230,10 @@
     } else if (panel.type === 'train' && panel.crs) {
       getDepartures(panel.crs, 8, panel.platform ?? null).then(({ departures, platforms }) => {
         trainData[panel.crs!] = { departures, platforms, error: '', loading: false };
+      }).catch(() => {});
+    } else if (panel.type === 'tfl' && panel.stopId) {
+      getStopArrivals(panel.stopId).then(data => {
+        setTflArrivals(panel.stopId!, data);
       }).catch(() => {});
     }
   }
@@ -214,9 +257,9 @@
     panels = panels.map(p => p.id === panelId ? { ...p, platform } : p);
     savePanels(panels);
     platformDropdownOpen = null;
-    // Re-fetch for that station
+    // Re-fetch for train stations; TfL panels filter their cached arrivals client-side
     const panel = panels.find(p => p.id === panelId);
-    if (panel?.crs) {
+    if (panel?.type === 'train' && panel.crs) {
       trainData[panel.crs] = { departures: [], platforms: trainData[panel.crs]?.platforms ?? [], error: '', loading: true };
       getDepartures(panel.crs, 8, platform).then(({ departures, platforms }) => {
         trainData[panel.crs!] = { departures, platforms, error: '', loading: false };
@@ -244,6 +287,7 @@
       
       const busStopIds = busPanels.map(p => p.stopId!.toUpperCase());
       const trainLabels = trainPanels.map(p => normalizeStationName(p.label));
+      const tflStopIds = panels.filter(p => p.type === 'tfl' && p.stopId).map(p => p.stopId!.toUpperCase());
       
       const allDisruptions = await loadDisruptionFeed();
 
@@ -273,12 +317,10 @@
           return busStopIds.some(id => atco === id || stationAtco === id);
         }
         
-        // Match train stations: exact normalised station name
-        if (mode === 'national-rail' || mode === 'tube' || mode === 'overground' || mode === 'dlr' || mode === 'elizabeth-line') {
-          return commonName !== '' && trainLabels.includes(commonName);
-        }
-        
-        return false;
+        // Every other mode (rail, tube, DLR, tram, river, cable car, coach, replacement bus):
+        // TfL stations by exact NaPTAN station ID, train stations by exact normalised name
+        if (tflStopIds.some(id => atco === id || stationAtco === id)) return true;
+        return commonName !== '' && trainLabels.includes(commonName);
       });
       
       const typeRank = (type: string) =>
@@ -317,17 +359,6 @@
       disruptionsError = e.message;
       disruptions = [];
     }
-  }
-
-  // Normalize station names for exact matching (remove prefixes/suffixes)
-  function normalizeStationName(name: string): string {
-    return name
-      .toUpperCase()
-      .replace(/^LONDON\s+/, '')
-      .replace(/\s+(UNDERGROUND|RAIL|DLR)\s+STATION$/, '')
-      .replace(/\s+STATION$/, '')
-      .replace(/\s+UNDERGROUND$/, '')
-      .trim();
   }
 
   async function searchStationDisruptions(query: string) {
@@ -454,6 +485,37 @@
   function getLineColor(lineId: string): string {
     const line = TUBE_LINES.find(l => l.id === lineId || l.name.toLowerCase() === lineId.toLowerCase());
     return line?.color ?? '#aaaaaa';
+  }
+
+  const TFL_MODE_STYLES: Record<string, { label: string; color: string }> = {
+    'tube': { label: 'TUBE', color: '#0019A8' },
+    'dlr': { label: 'DLR', color: '#00A4A7' },
+    'overground': { label: 'OVERGROUND', color: '#EE7C0E' },
+    'elizabeth-line': { label: 'ELIZABETH', color: '#6950A1' },
+    'tram': { label: 'TRAM', color: '#84B817' },
+    'river-bus': { label: 'RIVER', color: '#00A0E2' },
+    'cable-car': { label: 'CABLE CAR', color: '#E21836' },
+  };
+
+  function modeLabel(mode: string | undefined): string {
+    return TFL_MODE_STYLES[mode ?? '']?.label ?? 'TFL';
+  }
+
+  function modeColor(mode: string | undefined): string {
+    return TFL_MODE_STYLES[mode ?? '']?.color ?? '#aaaaaa';
+  }
+
+  // Strip the station suffix TfL appends to rail destinations
+  function formatTflDestination(arrival: any): string {
+    const dest = [arrival.destinationName, arrival.towards].find(v => v && v !== 'null') || '—';
+    return dest.toUpperCase().replace(/\s+(UNDERGROUND|RAIL|DLR)\s+STATION$/, '');
+  }
+
+  // "Westbound - Platform 1" -> "1"; values without a platform number are shown as is
+  function shortPlatform(name: string | undefined): string {
+    if (!name || name === 'null') return '-';
+    const m = name.match(/platform\s+(\S+)/i);
+    return (m ? m[1] : name).toUpperCase();
   }
 
   function formatEventTime(iso: string): string {
@@ -752,7 +814,7 @@
               </div>
             {/each}
           {/if}
-        {:else}
+        {:else if panel.type === 'train'}
           <!-- Train Panel -->
           {@const td = trainData[panel.crs!] ?? { departures: [], error: '', loading: true }}
           <div class="section-header">
@@ -797,6 +859,55 @@
                 <span class="col-train-dest led-yellow">{svc.destination.toUpperCase()}</span>
                 <span class="col-train-status" class:status-good={svc.etd === 'On time'} class:status-delay={svc.etd !== 'On time'}>{svc.etd.toUpperCase()}</span>
                 <span class="col-plat">{svc.platform ?? '-'}</span>
+              </div>
+            {/each}
+          {/if}
+        {:else if panel.type === 'tfl'}
+          <!-- TfL Panel (tube, DLR, Overground, Elizabeth line, tram, river bus, cable car) -->
+          {@const tflRows = (stopArrivals[panel.stopId!] ?? []).filter(a => a.modeName === panel.mode && (!panel.platform || a.platformName === panel.platform)).slice(0, 8)}
+          <div class="section-header">
+            {#if editMode}
+              <button class="remove-btn" onclick={() => removePanel(panel.id)}>&#10005;</button>
+            {/if}
+            <span class="section-type-badge badge-tfl" style="background: {modeColor(panel.mode)}">{modeLabel(panel.mode)}</span>
+            <span class="section-label">{panel.label.toUpperCase()}</span>
+            <span class="section-label-sep">—</span>
+            <span class="platform-selector" style="position: relative;">
+              <button class="platform-tap" onclick={() => { platformDropdownOpen = platformDropdownOpen === panel.id ? null : panel.id; }}>
+                {panel.platform ? panel.platform.toUpperCase() : 'ALL PLATFORMS'}
+                <span class="platform-caret">&#9662;</span>
+              </button>
+              {#if platformDropdownOpen === panel.id}
+                {@const knownPlatforms = tflPlatforms[panel.stopId!]?.[panel.mode!] ?? []}
+                <div class="platform-dropdown">
+                  <button class="plat-option" class:plat-active={!panel.platform} onclick={() => changePlatform(panel.id, null)}>ALL</button>
+                  {#each knownPlatforms as plat}
+                    <button class="plat-option" class:plat-active={panel.platform === plat} onclick={() => changePlatform(panel.id, plat)}>{plat.toUpperCase()}</button>
+                  {/each}
+                </div>
+              {/if}
+            </span>
+          </div>
+          <div class="col-header-row col-header-yellow">
+            <span class="col-tfl-line">LINE</span>
+            <span class="col-dest">DESTINATION</span>
+            <span class="col-tfl-plat">PLAT</span>
+            <span class="col-mins">MINS</span>
+          </div>
+          {#if stopErrors[panel.stopId!]}
+            <div class="led-row"><span class="error-text">{stopErrors[panel.stopId!]}</span></div>
+          {:else if !tflPlatforms[panel.stopId!]}
+            <div class="led-row"><span class="loading-text">AWAITING DATA...</span></div>
+          {:else if tflRows.length === 0}
+            <div class="led-row"><span class="loading-text">NO LIVE PREDICTIONS</span></div>
+          {:else}
+            {#each tflRows as arrival, i}
+              {@const mins = formatMins(arrival.timeToStation)}
+              <div class="led-row" class:row-alt={i % 2 === 1}>
+                <span class="col-tfl-line line-name" style="color: {getLineColor(arrival.lineId)}">{(arrival.lineName ?? '').toUpperCase()}</span>
+                <span class="col-dest led-yellow">{formatTflDestination(arrival)}</span>
+                <span class="col-tfl-plat">{shortPlatform(arrival.platformName)}</span>
+                <span class="col-mins" class:due-blink={mins === 'DUE'} class:due-text={mins === 'DUE'}>{mins}</span>
               </div>
             {/each}
           {/if}
@@ -883,6 +994,11 @@
   .badge-train {
     background: #00AAFF;
     color: #000;
+  }
+
+  /* Background is the TfL mode colour, set inline */
+  .badge-tfl {
+    color: #fff;
   }
 
   .badge-stop-letter {
@@ -1029,7 +1145,6 @@
     text-align: right;
     flex-shrink: 0;
     font-weight: bold;
-    font-size: 1.1rem;
   }
 
   .due-text {
@@ -1062,6 +1177,24 @@
     width: 50px;
     text-align: right;
     flex-shrink: 0;
+  }
+
+  /* ── TfL Columns ── */
+  .col-tfl-line {
+    width: 120px;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .col-tfl-plat {
+    width: 80px;
+    text-align: right;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* ── Status Colors (LED green / red) ── */
@@ -1131,10 +1264,12 @@
       letter-spacing: 2px;
     }
     .col-route { width: 50px; }
-    .col-mins { width: 45px; font-size: 0.9rem; }
+    .col-mins { width: 45px; }
     .col-time { width: 50px; }
     .col-train-status { width: 80px; }
     .col-plat { width: 36px; }
+    .col-tfl-line { width: 70px; }
+    .col-tfl-plat { width: 56px; }
     .appointments .col-time { width: 100px; }
     .led-sub-row {
       padding: 6px 12px 10px 12px;
@@ -1481,14 +1616,14 @@
 
   /* ── Alert Panel: hazard tape frame while alerts are active ── */
   .alert-panel {
-    padding: 6px;
+    padding: 3.6px;
     border: 0;
     background: repeating-linear-gradient(
       -45deg,
       #000 0,
-      #000 6px,
-      #FFD600 6px,
-      #FFD600 12px
+      #000 3.6px,
+      #FFD600 3.6px,
+      #FFD600 7.2px
     );
   }
 

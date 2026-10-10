@@ -1,20 +1,25 @@
 <script lang="ts">
-  import { searchBusStops, getStopDetails, type StopChild } from '$lib/api/search';
+  import { searchBusStops, getStopDetails, searchTflStops, getTflStations, type StopChild, type TflStation } from '$lib/api/search';
+  import { getStopArrivals } from '$lib/api/tfl';
   import stations from '$lib/data/stations.json';
   import type { TransportPanel } from '$lib/types/transport';
+  import { normalizeStationName } from '$lib/utils/stations';
 
   type NewPanel = Omit<TransportPanel, 'id'>;
+  type RailStation = { name: string; crs: string };
+  // One picker row per station and mode; rail is the stations.json match for a National Rail row
+  type StationRow = { station: TflStation; mode: string; rail: RailStation | null };
 
   let { onAdd, onClose }: { onAdd: (panel: NewPanel) => void; onClose: () => void } = $props();
 
-  let activeTab: 'bus' | 'train' = $state('bus');
+  let activeTab: 'bus' | 'trains' = $state('bus');
   let query = $state('');
   let busResults: { id: string; name: string }[] = $state([]);
   let busLoading = $state(false);
   let busError = $state('');
   let busAdding = $state(false);
-  let trainResults: { name: string; crs: string }[] = $state([]);
-  let selectedStation: { name: string; crs: string } | null = $state(null);
+  let trainResults: RailStation[] = $state([]);
+  let selectedStation: RailStation | null = $state(null);
   let stationPlatforms: string[] = $state([]);
   let platformsLoading = $state(false);
   let debounceTimer: ReturnType<typeof setTimeout> | null = $state(null);
@@ -23,11 +28,43 @@
   let busChildren: StopChild[] = $state([]);
   let busParentName = $state('');
 
+  // Trains tab: National Rail (stations.json, Huxley departures) plus TfL modes
+  // (tube, DLR, Overground, Elizabeth line, tram, river bus, cable car)
+  const RAIL_MODE = 'national-rail';
+  const TFL_MODES = ['tube', 'dlr', 'overground', 'elizabeth-line', 'tram', 'river-bus', 'cable-car'];
+  const TRAIN_CHIPS = [RAIL_MODE, ...TFL_MODES];
+  const MODE_LABELS: Record<string, string> = {
+    'tube': 'TUBE',
+    'dlr': 'DLR',
+    'overground': 'OVERGROUND',
+    'elizabeth-line': 'ELIZABETH',
+    'tram': 'TRAM',
+    'river-bus': 'RIVER',
+    'cable-car': 'CABLE CAR',
+    'national-rail': 'RAIL',
+  };
+  let trainsMode: string | null = $state(null); // null = all modes; RAIL is not sent to TfL
+  const showRail = $derived(trainsMode === null || trainsMode === RAIL_MODE);
+  const showTfl = $derived(trainsMode !== RAIL_MODE);
+  let tflResults: { id: string; name: string; modes: string[] }[] = $state([]);
+  let tflLoading = $state(false);
+  let tflError = $state('');
+  let tflResolving = $state(false);
+  let tflSearchSeq = 0;
+  // Station picker (search result resolves to several stations, e.g. an interchange)
+  let tflCandidates: StationRow[] = $state([]);
+  let tflParentName = $state('');
+  // TfL platform step
+  let tflSelected: { station: TflStation; mode: string } | null = $state(null);
+  let tflPlatforms: string[] = $state([]);
+  let tflPlatformsLoading = $state(false);
+
   function handleQueryInput() {
     if (activeTab === 'bus') {
       debouncedBusSearch();
     } else {
       filterTrains();
+      if (showTfl) debouncedTflSearch();
     }
   }
 
@@ -64,7 +101,7 @@
     }
     const q = query.trim().toLowerCase();
     const qs = squashRepeats(q);
-    trainResults = (stations as { name: string; crs: string }[])
+    trainResults = (stations as RailStation[])
       .map(s => {
         const name = s.name.toLowerCase();
         const nameSq = squashRepeats(name);
@@ -91,7 +128,7 @@
       .slice(0, 10);
   }
 
-  function switchTab(tab: 'bus' | 'train') {
+  function switchTab(tab: 'bus' | 'trains') {
     activeTab = tab;
     query = '';
     busResults = [];
@@ -104,6 +141,179 @@
     selectedStation = null;
     stationPlatforms = [];
     platformsLoading = false;
+    tflSearchSeq++;
+    trainsMode = null;
+    tflResults = [];
+    tflLoading = false;
+    tflError = '';
+    tflResolving = false;
+    tflCandidates = [];
+    tflParentName = '';
+    tflSelected = null;
+    tflPlatforms = [];
+    tflPlatformsLoading = false;
+  }
+
+  function debouncedTflSearch() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    tflError = '';
+    tflResolving = false;
+    const seq = ++tflSearchSeq;
+    const searchQuery = query.trim();
+    if (searchQuery.length < 2) {
+      tflResults = [];
+      tflLoading = false;
+      return;
+    }
+    tflLoading = true;
+    const modes = trainsMode ? [trainsMode] : TFL_MODES;
+    debounceTimer = setTimeout(async () => {
+      try {
+        const results = await searchTflStops(searchQuery, modes);
+        // A newer keystroke, chip change or tab switch superseded this search
+        if (seq !== tflSearchSeq) return;
+        tflResults = results;
+        tflLoading = false;
+      } catch (e: any) {
+        if (seq !== tflSearchSeq) return;
+        tflError = e.message;
+        tflLoading = false;
+      }
+    }, 300);
+  }
+
+  function selectTrainsMode(mode: string | null) {
+    trainsMode = mode;
+    if (mode === RAIL_MODE) {
+      // RAIL searches stations.json only: drop any pending TfL search or resolve
+      if (debounceTimer) clearTimeout(debounceTimer);
+      tflSearchSeq++;
+      tflResults = [];
+      tflLoading = false;
+      tflError = '';
+      tflResolving = false;
+    } else if (query.trim().length >= 2) {
+      debouncedTflSearch();
+    }
+  }
+
+  // Exact normalised name match against stations.json; ambiguous or missing gives null
+  function findRailStation(name: string): RailStation | null {
+    // TfL writes "King's Cross", stations.json "Kings Cross"
+    const railKey = (n: string) => normalizeStationName(n).replace(/['’]/g, '');
+    const key = railKey(name);
+    const matches = (stations as RailStation[]).filter(s => railKey(s.name) === key);
+    return matches.length === 1 ? { name: matches[0].name, crs: matches[0].crs } : null;
+  }
+
+  function stationRow(station: TflStation, mode: string): StationRow {
+    return { station, mode, rail: mode === RAIL_MODE ? findRailStation(station.name) : null };
+  }
+
+  function rowUsable(row: StationRow): boolean {
+    return row.mode !== RAIL_MODE || row.rail !== null;
+  }
+
+  // A station listed once per mode gets the mode in its row label
+  function tflCandidateLabel(row: StationRow): string {
+    const name = tflLabel(row.station.name).toUpperCase();
+    const repeated = tflCandidates.filter(r => r.station.naptanId === row.station.naptanId).length > 1;
+    return repeated ? `${name} · ${MODE_LABELS[row.mode] ?? row.mode.toUpperCase()}` : name;
+  }
+
+  function tflLabel(name: string): string {
+    return name.replace(/\s+(Underground|Rail|DLR) Station$/i, '');
+  }
+
+  async function selectTflResult(result: { id: string; name: string; modes: string[] }) {
+    tflResolving = true;
+    tflError = '';
+    // A keystroke, chip change or tab switch while resolving bumps the sequence and discards this result
+    const seq = tflSearchSeq;
+    try {
+      const stationList = await getTflStations(result.id);
+      if (seq !== tflSearchSeq) return;
+      const candidates: StationRow[] = [];
+      for (const station of stationList) {
+        if (trainsMode) {
+          if (station.modes.includes(trainsMode)) candidates.push(stationRow(station, trainsMode));
+          continue;
+        }
+        for (const mode of TFL_MODES.filter(m => station.modes.includes(m))) candidates.push(stationRow(station, mode));
+        if (station.modes.includes(RAIL_MODE)) {
+          const row = stationRow(station, RAIL_MODE);
+          // Some hubs list one rail station under two NaPTANs (e.g. Wimbledon), keep one row per CRS
+          if (!row.rail || !candidates.some(c => c.rail?.crs === row.rail!.crs)) candidates.push(row);
+        }
+      }
+      const enabled = candidates.filter(rowUsable);
+      tflResolving = false;
+
+      // Exactly one usable station and mode: skip the picker
+      if (enabled.length === 1) {
+        selectCandidate(enabled[0]);
+        return;
+      }
+      if (candidates.length === 0) {
+        tflError = 'NO STATIONS WITH LIVE ARRIVALS FOUND';
+        return;
+      }
+      tflCandidates = candidates;
+      tflParentName = result.name;
+    } catch (e: any) {
+      if (seq !== tflSearchSeq) return;
+      tflError = e.message;
+      tflResolving = false;
+    }
+  }
+
+  // RAIL rows go to the train platform picker, TfL rows to the TfL one
+  function selectCandidate(row: StationRow) {
+    if (row.mode === RAIL_MODE) {
+      if (row.rail) selectTrainStation(row.rail);
+    } else {
+      selectTflStation(row.station, row.mode);
+    }
+  }
+
+  async function selectTflStation(station: TflStation, mode: string) {
+    tflSelected = { station, mode };
+    tflPlatforms = [];
+    tflPlatformsLoading = true;
+    try {
+      const arrivals = await getStopArrivals(station.naptanId);
+      // User went back or picked another station or mode while this was loading
+      if (tflSelected?.station.naptanId !== station.naptanId || tflSelected.mode !== mode) return;
+      // A station can serve several modes, keep only this mode's platforms
+      const names = arrivals
+        .filter((a: any) => a.modeName === mode)
+        .map((a: any) => a.platformName)
+        .filter((n: any) => typeof n === 'string' && n.trim() !== '' && n !== 'null');
+      tflPlatforms = [...new Set<string>(names)].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    } catch { /* leave tflPlatforms empty, ALL is still offered */ }
+    tflPlatformsLoading = false;
+  }
+
+  function selectTflPlatform(platform: string | null) {
+    if (!tflSelected) return;
+    onAdd({
+      type: 'tfl',
+      label: tflLabel(tflSelected.station.name),
+      stopId: tflSelected.station.naptanId,
+      mode: tflSelected.mode,
+      platform,
+    });
+  }
+
+  function backFromTflPlatforms() {
+    tflSelected = null;
+    tflPlatforms = [];
+    tflPlatformsLoading = false;
+  }
+
+  function backFromTflStations() {
+    tflCandidates = [];
+    tflParentName = '';
   }
 
   async function selectBusStop(stop: { id: string; name: string }) {
@@ -143,10 +353,11 @@
     platformsLoading = false;
   }
 
-  async function selectTrainStation(station: { name: string; crs: string }) {
+  async function selectTrainStation(station: RailStation) {
     selectedStation = station;
     stationPlatforms = [];
     platformsLoading = true;
+    let platforms: string[] = [];
     try {
       const res = await fetch(`/api/rail/departures/${station.crs}?numRows=20`);
       if (res.ok) {
@@ -155,12 +366,15 @@
         for (const svc of data.trainServices ?? []) {
           if (svc.platform && !seen.has(svc.platform)) seen.add(svc.platform);
         }
-        stationPlatforms = [...seen].sort((a, b) => {
+        platforms = [...seen].sort((a, b) => {
           const na = parseInt(a), nb = parseInt(b);
           return isNaN(na) || isNaN(nb) ? a.localeCompare(b) : na - nb;
         });
       }
     } catch { /* leave stationPlatforms empty — fallback handles it */ }
+    // User went back or picked another station while this was loading
+    if (selectedStation?.crs !== station.crs) return;
+    stationPlatforms = platforms;
     platformsLoading = false;
   }
 
@@ -172,6 +386,13 @@
       crs: selectedStation.crs,
       platform,
     });
+  }
+
+  // Back to the station picker when the station came from it, else to the results
+  function backFromTrainPlatforms() {
+    selectedStation = null;
+    stationPlatforms = [];
+    platformsLoading = false;
   }
 
   function handleOverlayClick(e: MouseEvent) {
@@ -201,10 +422,10 @@
       </button>
       <button
         class="tab-btn"
-        class:tab-active-train={activeTab === 'train'}
-        onclick={() => switchTab('train')}
+        class:tab-active-trains={activeTab === 'trains'}
+        onclick={() => switchTab('trains')}
       >
-        <span class="tab-badge badge-train">TRAIN</span>
+        <span class="tab-badge badge-trains">TRAINS</span>
       </button>
     </div>
 
@@ -256,9 +477,64 @@
             {/if}
           {/if}
         </div>
-        <button class="back-btn" onclick={() => { selectedStation = null; stationPlatforms = []; platformsLoading = false; }}>&#8592; BACK TO RESULTS</button>
+        <button class="back-btn" onclick={backFromTrainPlatforms}>&#8592; {tflCandidates.length > 0 ? 'BACK TO STATIONS' : 'BACK TO RESULTS'}</button>
+      </div>
+
+    <!-- TfL platform picker -->
+    {:else if tflSelected}
+      <div class="platform-picker">
+        <div class="platform-label">SELECT PLATFORM FOR {tflLabel(tflSelected.station.name).toUpperCase()}</div>
+        <div class="platform-buttons">
+          {#if tflPlatformsLoading}
+            <span class="platform-label" style="font-size: 0.7rem; color: #888;">LOADING PLATFORMS...</span>
+          {:else}
+            <button class="plat-btn" onclick={() => selectTflPlatform(null)}>ALL</button>
+            {#each tflPlatforms as plat}
+              <button class="plat-btn" onclick={() => selectTflPlatform(plat)}>{plat.toUpperCase()}</button>
+            {/each}
+          {/if}
+        </div>
+        <button class="back-btn" onclick={backFromTflPlatforms}>&#8592; {tflCandidates.length > 0 ? 'BACK TO STATIONS' : 'BACK TO RESULTS'}</button>
+      </div>
+
+    <!-- Station picker (search result covers several stations, e.g. an interchange) -->
+    {:else if tflCandidates.length > 0}
+      <div class="platform-picker">
+        <div class="platform-label">SELECT STATION FOR {tflParentName.toUpperCase()}</div>
+        <div class="results-list">
+          {#each tflCandidates as row, i}
+            {@const usable = rowUsable(row)}
+            <button
+              class="result-row"
+              class:result-alt={i % 2 === 1}
+              class:result-disabled={!usable}
+              disabled={!usable}
+              onclick={() => selectCandidate(row)}
+            >
+              <span class="result-name">{tflCandidateLabel(row)}</span>
+              {#if usable}
+                <span class="mode-tags">
+                  <span class="mode-tag">{MODE_LABELS[row.mode] ?? row.mode.toUpperCase()}</span>
+                </span>
+              {:else}
+                <span class="result-hint">SEARCH WITH RAIL CHIP</span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+        <button class="back-btn" onclick={backFromTflStations}>&#8592; BACK TO RESULTS</button>
       </div>
     {:else}
+      {#if activeTab === 'trains'}
+        <!-- Mode filter (RAIL searches stations.json, the rest search TfL) -->
+        <div class="mode-chips">
+          <button class="mode-chip" class:mode-chip-active={trainsMode === null} onclick={() => selectTrainsMode(null)}>ALL</button>
+          {#each TRAIN_CHIPS as m}
+            <button class="mode-chip" class:mode-chip-active={trainsMode === m} onclick={() => selectTrainsMode(m)}>{MODE_LABELS[m]}</button>
+          {/each}
+        </div>
+      {/if}
+
       <!-- Search input -->
       <div class="search-wrapper">
         <input
@@ -295,22 +571,61 @@
               </button>
             {/each}
           {/if}
+        {:else if tflResolving}
+          <div class="result-msg">LOADING STOP...</div>
+        {:else if query.trim().length < 1}
+          <div class="result-msg">TYPE TO SEARCH STATIONS</div>
         {:else}
-          {#if query.trim().length < 1}
-            <div class="result-msg">TYPE TO SEARCH STATIONS</div>
-          {:else if trainResults.length === 0}
-            <div class="result-msg">NO STATIONS FOUND</div>
-          {:else}
-            {#each trainResults as station, i}
-              <button
-                class="result-row"
-                class:result-alt={i % 2 === 1}
-                onclick={() => selectTrainStation(station)}
-              >
-                <span class="result-name">{station.name.toUpperCase()}</span>
-                <span class="result-crs">{station.crs}</span>
-              </button>
-            {/each}
+          {#if showRail}
+            {#if showTfl}
+              <div class="group-label">NATIONAL RAIL</div>
+            {/if}
+            {#if trainResults.length === 0}
+              <div class="result-msg">NO RAIL STATIONS FOUND</div>
+            {:else}
+              {#each trainResults as station, i}
+                <button
+                  class="result-row"
+                  class:result-alt={i % 2 === 1}
+                  onclick={() => selectTrainStation(station)}
+                >
+                  <span class="result-name">{station.name.toUpperCase()}</span>
+                  <span class="mode-tags">
+                    <span class="mode-tag">{MODE_LABELS[RAIL_MODE]}</span>
+                  </span>
+                  <span class="result-crs">{station.crs}</span>
+                </button>
+              {/each}
+            {/if}
+          {/if}
+          {#if showTfl}
+            {#if showRail}
+              <div class="group-label">TFL</div>
+            {/if}
+            {#if tflLoading}
+              <div class="result-msg">SEARCHING TFL...</div>
+            {:else if tflError}
+              <div class="result-msg result-error">{tflError}</div>
+            {:else if query.trim().length < 2}
+              <div class="result-msg">TYPE AT LEAST 2 CHARACTERS</div>
+            {:else if tflResults.length === 0}
+              <div class="result-msg">NO TFL STOPS FOUND</div>
+            {:else}
+              {#each tflResults as stop, i}
+                <button
+                  class="result-row"
+                  class:result-alt={i % 2 === 1}
+                  onclick={() => selectTflResult(stop)}
+                >
+                  <span class="result-name">{stop.name.toUpperCase()}</span>
+                  <span class="mode-tags">
+                    {#each stop.modes.filter(m => TFL_MODES.includes(m)) as m}
+                      <span class="mode-tag">{MODE_LABELS[m]}</span>
+                    {/each}
+                  </span>
+                </button>
+              {/each}
+            {/if}
           {/if}
         {/if}
       </div>
@@ -398,8 +713,8 @@
     border-bottom-color: var(--accent);
   }
 
-  .tab-active-train {
-    border-bottom-color: #00AAFF;
+  .tab-active-trains {
+    border-bottom-color: #DC241F;
   }
 
   .tab-badge {
@@ -415,7 +730,7 @@
   }
 
   .tab-active-bus .tab-badge,
-  .tab-active-train .tab-badge {
+  .tab-active-trains .tab-badge {
     opacity: 1;
   }
 
@@ -424,9 +739,40 @@
     color: #000;
   }
 
-  .badge-train {
-    background: #00AAFF;
-    color: #000;
+  .badge-trains {
+    background: #DC241F;
+    color: #fff;
+  }
+
+  /* ── Trains mode filter chips ── */
+  .mode-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 12px 20px 0 20px;
+    background: var(--bg-primary);
+  }
+
+  .mode-chip {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1.5px;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+
+  .mode-chip:hover {
+    color: var(--text-secondary);
+  }
+
+  .mode-chip-active {
+    color: var(--text-secondary);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
   }
 
   .search-wrapper {
@@ -512,6 +858,50 @@
     font-size: 0.75rem;
     margin-left: 12px;
     text-shadow: 0 0 6px var(--accent-glow);
+  }
+
+  .mode-tags {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: 12px;
+  }
+
+  .mode-tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 1px;
+    padding: 1px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    color: var(--text-primary);
+    text-shadow: none;
+  }
+
+  .result-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .result-hint {
+    flex-shrink: 0;
+    margin-left: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    text-shadow: none;
+  }
+
+  .group-label {
+    padding: 8px 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    text-align: left;
   }
 
   .result-msg {

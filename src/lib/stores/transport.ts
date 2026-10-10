@@ -13,17 +13,24 @@ const DEFAULT_PANELS: TransportPanel[] = [
 // Anything that doesn't match the expected shape is discarded so a corrupted
 // or tampered-with storage entry can't crash the app or be used as an
 // injection vector into fetch URLs.
+const TFL_MODES = new Set(['tube', 'dlr', 'overground', 'elizabeth-line', 'tram', 'river-bus', 'cable-car']);
+
 function isValidPanel(p: unknown): p is TransportPanel {
   if (!p || typeof p !== 'object') return false;
   const o = p as Record<string, unknown>;
   if (typeof o.id !== 'string') return false;
-  if (o.type !== 'bus' && o.type !== 'train') return false;
   if (typeof o.label !== 'string') return false;
   if (o.type === 'bus') {
     if (typeof o.stopId !== 'string') return false;
-  } else {
+  } else if (o.type === 'train') {
     if (typeof o.crs !== 'string') return false;
     if (o.platform !== null && typeof o.platform !== 'string') return false;
+  } else if (o.type === 'tfl') {
+    if (typeof o.stopId !== 'string') return false;
+    if (typeof o.mode !== 'string' || !TFL_MODES.has(o.mode)) return false;
+    if (o.platform !== null && o.platform !== undefined && typeof o.platform !== 'string') return false;
+  } else {
+    return false;
   }
   return true;
 }

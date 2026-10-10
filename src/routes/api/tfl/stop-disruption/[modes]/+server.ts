@@ -13,6 +13,10 @@ const ALLOWED_MODES = new Set([
   'tram',
   'river-bus',
   'tflrail',
+  'cable-car',
+  'replacement-bus',
+  'river-tour',
+  'coach',
 ]);
 
 async function fetchModeDisruptions(mode: string): Promise<unknown[]> {
@@ -30,7 +34,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
   if (!isAllowedOrigin(request)) return forbidden();
 
   const raw = params.modes ?? '';
-  if (raw.length === 0 || raw.length > 100) {
+  if (raw.length === 0 || raw.length > 200) {
     return json({ error: 'Invalid parameter' }, { status: 400 });
   }
   const modes = [...new Set(raw.split(','))];
