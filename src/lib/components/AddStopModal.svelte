@@ -52,14 +52,42 @@
     }, 300);
   }
 
+  // Collapse repeated letters so "canon" matches "Cannon"
+  function squashRepeats(s: string): string {
+    return s.replace(/(.)\1+/g, '$1');
+  }
+
   function filterTrains() {
     if (query.trim().length < 1) {
       trainResults = [];
       return;
     }
     const q = query.trim().toLowerCase();
+    const qs = squashRepeats(q);
     trainResults = (stations as { name: string; crs: string }[])
-      .filter(s => s.name.toLowerCase().includes(q) || s.crs.toLowerCase() === q)
+      .map(s => {
+        const name = s.name.toLowerCase();
+        const nameSq = squashRepeats(name);
+        const crs = s.crs.toLowerCase();
+        const exact = name.includes(q) || crs === q;
+        if (!exact && !nameSq.includes(qs)) return null;
+        const words = name.split(/[\s()]+/).filter(Boolean);
+        const rank =
+          name === q || crs === q ? 0
+          : name.startsWith(q) || nameSq.startsWith(qs) ? 1
+          : words.some(w => w.startsWith(q) || squashRepeats(w).startsWith(qs)) ? 2
+          : 3;
+        const london = name.startsWith('london ') || name.endsWith('(london)');
+        return { s, exact, rank, london };
+      })
+      .filter(m => m !== null)
+      // Exact matches before typo matches, then best match position, then London stations first
+      .sort((a, b) =>
+        Number(b.exact) - Number(a.exact) ||
+        a.rank - b.rank ||
+        Number(b.london) - Number(a.london) ||
+        a.s.name.localeCompare(b.s.name))
+      .map(m => m.s)
       .slice(0, 10);
   }
 
