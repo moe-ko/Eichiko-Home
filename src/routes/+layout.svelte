@@ -185,6 +185,7 @@
   const tabs = [
     { label: 'HOME', href: '/' },
     { label: 'F1', href: '/f1' },
+    { label: 'MUFC', href: '/mufc' },
   ];
 </script>
 
