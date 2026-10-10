@@ -452,8 +452,8 @@
   .weather-bar {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 14px 24px;
+    gap: 10px;
+    padding: 10px 24px;
     background: var(--bg-secondary);
     border-bottom: 2px solid var(--border-color);
     flex-wrap: wrap;
@@ -461,45 +461,45 @@
   }
 
   .weather-icon {
-    font-size: 1.6rem;
+    font-size: 1.12rem;
     color: var(--text-secondary);
   }
 
   .weather-temp {
     color: var(--text-body);
-    font-size: 1.3rem;
+    font-size: 0.91rem;
     font-weight: bold;
   }
 
   .weather-desc {
     color: var(--text-body);
-    font-size: 0.9rem;
+    font-size: 0.63rem;
   }
 
   .weather-sep {
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: 0.75rem;
   }
 
   .weather-pop {
     color: var(--text-body);
-    font-size: 0.9rem;
+    font-size: 0.75rem;
   }
 
   .weather-phrase {
     color: var(--text-body);
-    font-size: 0.9rem;
+    font-size: 0.75rem;
     text-transform: none;
   }
 
   .weather-error {
     color: var(--led-red);
-    font-size: 0.85rem;
+    font-size: 0.6rem;
   }
 
   .weather-loading {
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: 0.6rem;
   }
 
   /* ── Tab Bar ── */
@@ -548,7 +548,7 @@
     .weather-bar {
       justify-content: center;
       text-align: center;
-      padding: 10px 12px;
+      padding: 7px 12px;
     }
     .tab-bar {
       padding: 0 12px;
