@@ -533,6 +533,17 @@
     return `${day} ${mon} ${hh}:${mm}`;
   }
 
+  // TfL stop pages live at tfl.gov.uk/{mode}/stop/{id}/{slug}; the slug is cosmetic.
+  // Modes without their own path use the nearest one.
+  const TFL_PAGE_MODE: Record<string, string> = { 'replacement-bus': 'bus', coach: 'bus', 'river-tour': 'river-bus' };
+
+  function tflStopUrl(d: any): string {
+    const mode = TFL_PAGE_MODE[d.mode] ?? d.mode ?? 'tube';
+    const id = d.atcoCode || d.stationAtcoCode || '';
+    const slug = (d.commonName || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return `https://tfl.gov.uk/${encodeURIComponent(mode)}/stop/${encodeURIComponent(id)}/${slug}`;
+  }
+
   function formatDate(iso: string): string {
     const d = new Date(iso);
     const day = d.getDate().toString().padStart(2, '0');
@@ -622,7 +633,7 @@
                   <div class="alert-dates">
                     <span class="alert-from">FROM: {formatDate(d.fromDate)}</span>
                     <span class="alert-to">TO: {formatDate(d.toDate)}</span>
-                    <span class="alert-code">{d.atcoCode || d.stationAtcoCode}</span>
+                    <a class="alert-link" href={tflStopUrl(d)} target="_blank" rel="noopener noreferrer">MORE LIVE STATUS INFO</a>
                   </div>
                 </div>
               {/if}
@@ -1778,10 +1789,10 @@
     background: #0d0d0d;
     border: 2px solid #1a1200;
     border-radius: 4px;
-    padding: 12px 48px 12px 16px;
+    padding: 8px 34px 8px 11px;
     font-family: 'LED Dot-Matrix', monospace;
-    font-size: 0.85rem;
-    letter-spacing: 2px;
+    font-size: 0.6rem;
+    letter-spacing: 1.4px;
     color: #FFD600;
     text-transform: uppercase;
     outline: none;
@@ -1800,11 +1811,11 @@
 
   .alert-search-icon {
     position: absolute;
-    right: 16px;
+    right: 11px;
     top: 50%;
     transform: translateY(-50%);
     color: #4a3a00;
-    font-size: 1rem;
+    font-size: 0.7rem;
     pointer-events: none;
   }
 
@@ -1955,15 +1966,17 @@
     border: 1px solid #1a1200;
   }
 
-  .alert-code {
-    font-family: 'LED Dot-Matrix', monospace;
-    font-size: 0.65rem;
-    letter-spacing: 1px;
-    color: #666;
-    background: #111;
-    padding: 1px 6px;
-    border: 1px solid #1a1200;
+  .alert-link {
+    background: #1a1200;
+    padding: 2px 8px;
+    border: 1px solid #3a2a00;
     border-radius: 2px;
+    color: #FFD600;
+    text-decoration: none;
+  }
+
+  .alert-link:hover {
+    border-color: #FFD600;
   }
 
   .alert-information {
